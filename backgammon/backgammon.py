@@ -85,8 +85,8 @@ class Backgammon:
 
     def is_valid_move(self, start: int, end: int) -> bool:
         piece_type = self.get_piece_type()
-        board_range = range(0, 24)
-        if start not in board_range and end not in board_range:
+        board_range = range(24)
+        if start not in board_range or end not in board_range:
             return False
         if self.board[start] * piece_type <= 0:
             return False

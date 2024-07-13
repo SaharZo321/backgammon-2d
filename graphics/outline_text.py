@@ -1,9 +1,9 @@
 import pygame
 
 
-class OutlineText():
-    _circle_cache: dict[int, list[tuple[int,int]]]= {}
-    
+class OutlineText:
+    _circle_cache: dict[int, list[tuple[int, int]]] = {}
+
     @classmethod
     def _circlepoints(cls, radius: float):
         radius = int(round(radius))
@@ -24,9 +24,16 @@ class OutlineText():
         points += [(x, -y) for x, y in points if y]
         points.sort()
         return points
-    
+
     @classmethod
-    def render(cls, text: str, font: pygame.font.Font, gfcolor: pygame.Color=pygame.Color('dodgerblue'), ocolor: pygame.Color=pygame.Color(255, 255, 255), opx: int=2) -> pygame.Surface:
+    def render(
+        cls,
+        text: str,
+        font: pygame.font.Font,
+        gfcolor: pygame.Color = pygame.Color("black"),
+        ocolor: pygame.Color = pygame.Color(255, 255, 255),
+        opx: int = 2,
+    ) -> pygame.Surface:
         textsurface = font.render(text, True, gfcolor).convert_alpha()
         w = textsurface.get_width() + 2 * opx
         h = font.get_height()
