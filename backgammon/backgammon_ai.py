@@ -7,25 +7,30 @@ import copy
 
 
 class BackgammonAI:
+    PIECE_SAFETY = 1
+    PRIME_BUILDING = 1
+    PIECE_MOBILITY = 1
+    PIECE_BEARING_OFF = 1
+    BAR = 1
 
     @classmethod
     def _evaluate_game_state(cls, state: GameState):
         score = 0
 
         # Factor 1: Piece Safety
-        score += cls._evaluate_piece_safety(state=state)
+        score += cls.PIECE_SAFETY * cls._evaluate_piece_safety(state=state)
 
         # Factor 2: Prime Building
-        score += cls._evaluate_prime_building(state=state)
+        score += cls.PRIME_BUILDING * cls._evaluate_prime_building(state=state)
 
         # Factor 3: Mobility
-        score += cls._evaluate_mobility(state=state)
+        score += cls.PIECE_MOBILITY * cls._evaluate_mobility(state=state)
 
         # Factor 4: Bearing Off
-        score += cls._evaluate_bearing_off(state=state)
+        score += cls.PIECE_BEARING_OFF * cls._evaluate_bearing_off(state=state)
 
         # Factor 5: Opponent's Bar
-        score += cls._evaluate_opponents_bar(state=state)
+        score += cls.BAR * cls._evaluate_opponents_bar(state=state)
 
         return score
 
@@ -76,8 +81,8 @@ class BackgammonAI:
         piece_type = Backgammon.get_piece_type(state.current_turn)
         home_range = range(18, 24) if piece_type == 1 else range(0, 6)
         for pos in home_range:
-            if state.board[pos] * piece_type > 0:
-                score += (pos % 6) * 10  # Reward closer pieces to bearing off
+            if state.board[pos] * piece_type > 1:
+                score += (pos % 6) * 15  # Reward closer pieces to bearing off
         score += (
             state.home[state.current_turn] * 100
         )  # High reward for borne off pieces
@@ -152,7 +157,7 @@ class BackgammonAI:
         current_possible_moves = cls._get_all_possible_moves(game)
         if len(current_possible_moves) == 0:
             return ScoredMoves(
-                score=cls._evaluate_game_state(game.to_state()), moves=played_moves_copy
+                score=cls._evaluate_game_state(game.to_state()), moves=[]
             )
 
         best_scored_moves = ScoredMoves(moves=[], score=-1000)
