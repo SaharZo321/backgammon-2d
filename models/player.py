@@ -3,8 +3,8 @@ from typing import Self
 
 
 class Player(Enum):
-    player1 = "player1"
-    player2 = "player2"
+    player1 = 1
+    player2 = -1
 
     @classmethod
     def other(cls, player: Self) -> Self:

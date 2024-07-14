@@ -1,14 +1,18 @@
 import pygame
 import pygame.gfxdraw
-from config import FRAMERATE, BUTTON_COLOR, BUTTON_HOVER_COLOR, RESOLUTION
+from config import FRAMERATE, BUTTON_COLOR, BUTTON_HOVER_COLOR, SETTINGS_ICON
 from graphics.graphics_manager import GraphicsManager, get_font
 from backgammon.backgammon import Backgammon
-from graphics.button import Button
+from backgammon.backgammon_ai import BackgammonAI
+from graphics.text_button import TextButton
 from graphics.outline_text import OutlineText
+from menus.options import options_menu
+from models.player import Player
+from models.move import Move, MoveType
 import math
 
 
-def offline_game(screen: pygame.Surface, clock: pygame.time.Clock):
+def bot_game(screen: pygame.Surface, clock: pygame.time.Clock):
     run = True
     player1_color = pygame.Color(100, 100, 100)
     player2_color = pygame.Color(150, 100, 100)
@@ -17,29 +21,73 @@ def offline_game(screen: pygame.Surface, clock: pygame.time.Clock):
     )
     backgammon = Backgammon()
     clicked_index = -1
+    bot_player = Player.player2
+    
+    def get_dice_string():
+        return str(backgammon.dice[0]) + " " + str(backgammon.dice[1])
+    
+    def bot_turn():
+        print(get_dice_string())
+        ai_moves = BackgammonAI.get_best_move(game=backgammon)
+        ai_moves.moves.reverse()
+        print(ai_moves)
+        for move in ai_moves.moves:
+            match move.move_type:
+                case MoveType.normal_move:
+                    backgammon.make_move(start=move.start, end=move.end)
+                case MoveType.bear_off:
+                    backgammon.bear_off(move.start)
+                case MoveType.leave_bar:
+                    backgammon.leave_bar(move.end)
+                    
+    if backgammon.current_turn == bot_player:
+        bot_turn()
+        backgammon.switch_turn()
+
+    
+
+    dice_string = get_dice_string()
 
     def leave_button_click():
         nonlocal run
         run = False
 
     def done_button_click():
-        backgammon.switch_turn()
-        DONE_BUTTON.toggle()
         if backgammon.is_game_over():
             print(backgammon.get_winner())
             nonlocal run
             run = False
+            return
+        
+        backgammon.switch_turn()
+        # nonlocal dice_string
+        # dice_string = get_dice_string()
+        # DONE_BUTTON.toggle()
+
+        bot_turn()
+        
+        if backgammon.is_game_over():
+            print(backgammon.get_winner())
+            run = False 
+            return           
+        
+        backgammon.switch_turn()
+        nonlocal dice_string
+        dice_string = get_dice_string()
 
     def undo_button_click():
         backgammon.undo()
         nonlocal highlighted_indexes
-        highlighted_indexes = backgammon.get_movable_counters()
+        highlighted_indexes = backgammon.get_movable_pieces()
 
-    highlighted_indexes = backgammon.get_movable_counters()
+    def settings_button_click():
+        options_menu(screen, clock)
+
+    highlighted_indexes = backgammon.get_movable_pieces()
 
     buttons_center = math.floor((GraphicsManager.RECT.right + screen.get_width()) / 2)
 
-    DONE_BUTTON = Button(
+    DONE_BUTTON = TextButton(
         background_image=None,
         position=(buttons_center, 300),
         text_input="DONE",
@@ -49,7 +97,7 @@ def offline_game(screen: pygame.Surface, clock: pygame.time.Clock):
         on_click=done_button_click,
     )
 
-    UNDO_BUTTON = Button(
+    UNDO_BUTTON = TextButton(
         background_image=None,
         position=(buttons_center, 420),
         text_input="UNDO",
@@ -59,7 +107,7 @@ def offline_game(screen: pygame.Surface, clock: pygame.time.Clock):
         on_click=undo_button_click,
     )
 
-    LEAVE_BUTTON = Button(
+    LEAVE_BUTTON = TextButton(
         background_image=None,
         position=(
             math.floor(GraphicsManager.RECT.left / 2),
@@ -72,10 +120,23 @@ def offline_game(screen: pygame.Surface, clock: pygame.time.Clock):
         on_click=leave_button_click,
     )
 
+    SETTINGS_BUTTON = TextButton(
+        background_image=SETTINGS_ICON,
+        position=(
+            screen.get_width() - 45,
+            45,
+        ),
+        text_input="",
+        font=get_font(50),
+        base_color=BUTTON_COLOR,
+        hovering_color=BUTTON_HOVER_COLOR,
+        on_click=settings_button_click,
+    )
+
     DONE_BUTTON.toggle()
     UNDO_BUTTON.toggle()
 
-    game_buttons = [DONE_BUTTON, UNDO_BUTTON, LEAVE_BUTTON]
+    game_buttons = [DONE_BUTTON, UNDO_BUTTON, LEAVE_BUTTON, SETTINGS_BUTTON]
 
     while run:
         clock.tick(FRAMERATE)
@@ -84,7 +145,6 @@ def offline_game(screen: pygame.Surface, clock: pygame.time.Clock):
         MOUSE_POSITION = pygame.mouse.get_pos()
 
         GraphicsManager.render_background(screen=screen)
-        dice_string = str(backgammon.dice["die1"]) + " " + str(backgammon.dice["die2"])
 
         DICE_TEXT = OutlineText.render(
             text=dice_string,
@@ -100,15 +160,17 @@ def offline_game(screen: pygame.Surface, clock: pygame.time.Clock):
             if backgammon.get_captured_pieces() > 0:
                 highlighted_indexes = backgammon.get_bar_leaving_positions()
             else:
-                highlighted_indexes = backgammon.get_movable_counters()
+                highlighted_indexes = backgammon.get_movable_pieces()
 
         graphics.render_board(backgammon.board, backgammon.bar, backgammon.home)
 
         graphics.highlight_tracks(highlighted_indexes)
-        if graphics.check_tracks_input(
-            mouse_position=MOUSE_POSITION
-        ) or graphics.check_home_track_input(
-            mouse_position=MOUSE_POSITION, player=backgammon.current_turn
+        if (
+            graphics.check_tracks_input(mouse_position=MOUSE_POSITION)
+            or graphics.check_home_track_input(
+                mouse_position=MOUSE_POSITION, player=backgammon.current_turn
+            )
+            or any(button.check_for_input(MOUSE_POSITION) for button in game_buttons)
         ):
             cursor = pygame.SYSTEM_CURSOR_HAND
 
@@ -152,17 +214,13 @@ def offline_game(screen: pygame.Surface, clock: pygame.time.Clock):
 
                         else:
                             if backgammon.get_captured_pieces() > 0:
-                                backgammon.leave_bar(
-                                    dice_value=abs(
-                                        backgammon.get_start_position() - index
-                                    )
-                                )
+                                backgammon.leave_bar(end=index)
 
                             else:
                                 backgammon.make_move(start=clicked_index, end=index)
 
                             # a piece had been moved
-                            highlighted_indexes = backgammon.get_movable_counters()
+                            highlighted_indexes = backgammon.get_movable_pieces()
                             clicked_index = -1
 
                 clicked_index = -1 if not did_hit_target else clicked_index

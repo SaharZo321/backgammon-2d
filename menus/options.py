@@ -1,31 +1,22 @@
 import pygame
 from graphics.text_button import TextButton
 from graphics.graphics_manager import get_font, get_mid_width
-from menus.offline import offline_game
-from menus.bot import bot_game
 from config import FRAMERATE, BUTTON_COLOR, BUTTON_HOVER_COLOR
 from game_manager import GameManager
 from graphics.graphics_manager import GraphicsManager
 
 
-def play_menu(screen: pygame.Surface, clock: pygame.time.Clock) -> None:
+def options_menu(screen: pygame.Surface, clock: pygame.time.Clock) -> None:
     run = True
 
     def back_button_click():
         nonlocal run
         run = False
 
-    def offline_button_click():
-        offline_game(screen, clock)
-        nonlocal run
-        run = False
+    def visuals_button_click():
+        pass
 
-    def online_button_click():
-        bot_game(screen, clock)
-        nonlocal run
-        run = False
-
-    ONLINE_BUTTON = TextButton(
+    VISUALS_BUTTON = TextButton(
         background_image=None,
         position=(get_mid_width(), 270),
         text_input="PLAY ONLINE",
@@ -33,20 +24,7 @@ def play_menu(screen: pygame.Surface, clock: pygame.time.Clock) -> None:
         base_color=BUTTON_COLOR,
         hovering_color=BUTTON_HOVER_COLOR,
         outline_color=pygame.Color("black"),
-        outline_size=1,
-        on_click=online_button_click,
-    )
-
-    OFFLINE_BUTTON = TextButton(
-        background_image=None,
-        position=(get_mid_width(), 420),
-        text_input="PLAY OFFLINE",
-        font=get_font(75),
-        base_color=BUTTON_COLOR,
-        hovering_color=BUTTON_HOVER_COLOR,
-        outline_color=pygame.Color("black"),
-        outline_size=1,
-        on_click=offline_button_click,
+        on_click=visuals_button_click,
     )
 
     BACK_BUTTON = TextButton(
@@ -61,7 +39,7 @@ def play_menu(screen: pygame.Surface, clock: pygame.time.Clock) -> None:
         on_click=back_button_click,
     )
 
-    buttons: list[TextButton] = [ONLINE_BUTTON, OFFLINE_BUTTON, BACK_BUTTON]
+    buttons: list[TextButton] = [VISUALS_BUTTON, BACK_BUTTON]
 
     while run:
         screen.fill("black")

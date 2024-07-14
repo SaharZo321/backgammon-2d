@@ -7,3 +7,6 @@ BUTTON_HOVER_COLOR = pygame.Color(250, 250, 250)
 BACKGROUND = pygame.transform.scale(
     pygame.image.load("assets/background.jpg"), (1280, 720)
 )
+SETTINGS_ICON = pygame.transform.scale(
+    pygame.image.load("assets/settings.png"), (60, 60)
+)
