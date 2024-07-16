@@ -26,22 +26,25 @@ class Backgammon:
             Player.player2: 0,
         }
         
-    def new_game(self):
-        self.board = self.create_board_check()
+    def new_game(self, winner: Player | None = None):
+        self.board = self.create_board()
         self.bar = {
             Player.player1: 0,
             Player.player2: 0,
         }  # Captured pieces for each player
         self.home = {
-            Player.player1: 14,
+            Player.player1: 0,
             Player.player2: 0,
         }  # Pieces in the home for each player
         self.roll_dice()
         while self.dice[0] == self.dice[1]:
             self.roll_dice()
-        self.current_turn = (
-            Player.player1 if self.dice[0] > self.dice[1] else Player.player2
-        )
+        if winner is None:
+            self.current_turn = (
+                Player.player1 if self.dice[0] > self.dice[1] else Player.player2
+            )
+        else:
+            self.current_turn = winner
         self.history = []
     
     def create_board(self) -> None:

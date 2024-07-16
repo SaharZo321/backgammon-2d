@@ -16,11 +16,20 @@ from server.server import Network, ServerFlags
 
 def online_client(screen: pygame.Surface, clock: pygame.time.Clock, ip_address: str):
     run = True
+    options = False
     player1_color = pygame.Color(100, 100, 100)
     player2_color = pygame.Color(150, 100, 100)
     graphics = GraphicsManager(
         screen=screen, player1_color=player1_color, player2_color=player2_color
     )
+
+    def open_options():
+        nonlocal options
+        options = True
+
+    def close_options():
+        nonlocal options
+        options = False
 
     refresh_frequency = 1000
     time = pygame.time.get_ticks()
@@ -29,7 +38,10 @@ def online_client(screen: pygame.Surface, clock: pygame.time.Clock, ip_address: 
     started = False
 
     network = Network(
-        ip_address=ip_address, port=config.GAME_PORT, buffer_size=config.NETWORK_BUFFER, timeout=10
+        ip_address=ip_address,
+        port=config.GAME_PORT,
+        buffer_size=config.NETWORK_BUFFER,
+        timeout=10,
     )
 
     def save_state(state: GameState):
@@ -57,9 +69,6 @@ def online_client(screen: pygame.Surface, clock: pygame.time.Clock, ip_address: 
 
     def undo_button_click():
         network.send(data=ServerFlags.UNDO, callback=save_state)
-
-    def settings_button_click():
-        options_menu(screen, clock)
 
     highlighted_indexes = get_movable_pieces()
 
@@ -99,7 +108,7 @@ def online_client(screen: pygame.Surface, clock: pygame.time.Clock, ip_address: 
     )
 
     SETTINGS_BUTTON = TextButton(
-        background_image=config.SETTINGS_ICON,
+        background_image=config.OPTIONS_ICON,
         position=(
             screen.get_width() - 45,
             45,
@@ -108,13 +117,16 @@ def online_client(screen: pygame.Surface, clock: pygame.time.Clock, ip_address: 
         font=get_font(50),
         base_color=config.BUTTON_COLOR,
         hovering_color=config.BUTTON_HOVER_COLOR,
-        on_click=settings_button_click,
+        on_click=open_options,
     )
 
     DONE_BUTTON.toggle(disabled=True)
     UNDO_BUTTON.toggle(disabled=True)
 
-    game_buttons = [DONE_BUTTON, UNDO_BUTTON, LEAVE_BUTTON, SETTINGS_BUTTON]
+    game_buttons = [DONE_BUTTON, UNDO_BUTTON]
+    always_on_buttons = [LEAVE_BUTTON, SETTINGS_BUTTON]
+
+    all_buttons = game_buttons + always_on_buttons
 
     def is_my_turn() -> bool:
         return current_state.current_turn == Player.player2
@@ -147,38 +159,40 @@ def online_client(screen: pygame.Surface, clock: pygame.time.Clock, ip_address: 
 
         graphics.highlight_tracks(highlighted_indexes)
         if (
-            is_my_turn()
+            not options
             and (
-                graphics.check_tracks_input(mouse_position=MOUSE_POSITION)
-                or graphics.check_home_track_input(
-                    mouse_position=MOUSE_POSITION, player=backgammon.current_turn
+                is_my_turn()
+                and (
+                    graphics.check_track_input(mouse_position=MOUSE_POSITION) != -1
+                    or graphics.check_home_track_input(
+                        mouse_position=MOUSE_POSITION, player=backgammon.current_turn
+                    )
                 )
             )
-        ) or any(button.check_for_input(MOUSE_POSITION) for button in game_buttons):
+            or any(button.check_for_input(MOUSE_POSITION) for button in all_buttons)
+        ):
             cursor = pygame.SYSTEM_CURSOR_HAND
 
         DONE_BUTTON.toggle(disabled=not is_my_turn() or not backgammon.is_turn_done())
         UNDO_BUTTON.toggle(disabled=not backgammon.has_history() or not is_my_turn())
 
-        for button in game_buttons:
+        for button in all_buttons:
             button.change_color(MOUSE_POSITION)
             button.update(screen)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 quit()
-            if event.type == pygame.MOUSEBUTTONDOWN and LEAVE_BUTTON.check_for_input(
-                MOUSE_POSITION
-            ):
-                LEAVE_BUTTON.click()
-
-            if event.type == pygame.MOUSEBUTTONDOWN and is_my_turn():
-
-                for button in game_buttons:
+            if event.type == pygame.MOUSEBUTTONDOWN and not options:
+                for button in always_on_buttons:
                     if button.check_for_input(mouse_position=MOUSE_POSITION):
                         button.click()
 
-                did_hit_target = False
+                if is_my_turn():
+                    for button in game_buttons:
+                        if button.check_for_input(mouse_position=MOUSE_POSITION):
+                            button.click()
+
                 if graphics.check_home_track_input(
                     mouse_position=MOUSE_POSITION, player=backgammon.current_turn
                 ):
@@ -186,53 +200,54 @@ def online_client(screen: pygame.Surface, clock: pygame.time.Clock, ip_address: 
                         move_type=MoveType.bear_off, start=last_clicked_index, end=24
                     )
                     network.send(data=move, callback=save_state)
+                    last_clicked_index = -1
 
-                for index in range(24):
-                    if graphics.check_track_input(
-                        mouse_position=MOUSE_POSITION, index=index
+                index = graphics.check_track_input(mouse_position=MOUSE_POSITION)
+                if index != -1:
+                    if (
+                        last_clicked_index == -1
+                        and backgammon.get_captured_pieces() == 0
                     ):
-                        did_hit_target = True
+                        last_clicked_index = index
+                        highlighted_indexes = backgammon.get_possible_tracks(
+                            last_clicked_index
+                        )
+                        print(highlighted_indexes)
 
-                        if (
-                            last_clicked_index == -1
-                            and backgammon.get_captured_pieces() == 0
-                        ):
-                            last_clicked_index = index
-                            highlighted_indexes = backgammon.get_possible_tracks(
-                                last_clicked_index
+                    else:
+                        if backgammon.get_captured_pieces() > 0:
+                            move = Move(
+                                move_type=MoveType.leave_bar,
+                                start=backgammon.get_start_position(),
+                                end=index,
                             )
-                            print(highlighted_indexes)
+                            network.send(data=move, callback=save_state)
 
                         else:
-                            if backgammon.get_captured_pieces() > 0:
-                                move = Move(
-                                    move_type=MoveType.leave_bar,
-                                    start=backgammon.get_start_position(),
-                                    end=index,
-                                )
-                                network.send(data=move, callback=save_state)
+                            move = Move(
+                                move_type=MoveType.normal_move,
+                                start=last_clicked_index,
+                                end=index,
+                            )
+                            network.send(data=move, callback=save_state)
 
-                            else:
-                                move = Move(
-                                    move_type=MoveType.normal_move,
-                                    start=last_clicked_index,
-                                    end=index,
-                                )
-                                network.send(data=move, callback=save_state)
+                        # a piece had been moved
+                        last_clicked_index = -1
+                        highlighted_indexes = backgammon.get_movable_pieces()
 
-                            # a piece had been moved
-                            highlighted_indexes = backgammon.get_movable_pieces()
-                            last_clicked_index = -1
-
-                last_clicked_index = -1 if not did_hit_target else last_clicked_index
-                print(last_clicked_index)
+                    print(last_clicked_index)
 
         if not network.got_last_send and network.is_trying_to_connect():
+            close_options()
             render_connecting(screen=screen)
             if not network.connected:
                 run = False
 
-        pygame.mouse.set_cursor(cursor)
+        if options:
+            options_menu(screen=screen, close=close_options)
+        else:
+            pygame.mouse.set_cursor(cursor)
+
         pygame.display.flip()
 
 

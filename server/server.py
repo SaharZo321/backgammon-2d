@@ -206,7 +206,7 @@ class Network:
     _time_from_send: float
 
     def __init__(
-        self, ip_address: str, port: int, buffer_size=2048, timeout=5, tries=5
+        self, ip_address: str, port: int, buffer_size=2048, timeout=5, tries=10
     ) -> None:
         self._client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._address = (ip_address, port)

@@ -1,13 +1,13 @@
 import pygame
 import pygame.gfxdraw
 import math
-from config import RESOLUTION, BACKGROUND
+import config
 from graphics.track_button import TrackButton
 from models.player import Player
 from models.game_state import GameState
 from graphics.outline_text import OutlineText
 
-SCREEN_WIDTH, SCREEN_HEIGHT = RESOLUTION
+SCREEN_WIDTH, SCREEN_HEIGHT = config.RESOLUTION
 
 
 def get_font(size, bold=False, italic=False) -> pygame.font.Font:
@@ -106,16 +106,17 @@ class GraphicsManager:
             else:
                 button.highlighted = False
 
-    def check_tracks_input(self, mouse_position: tuple[int, int]) -> bool:
+    def check_track_input(self, mouse_position: tuple[int, int]) -> int:
+        """
+        Returns the index of clicked track.
+        If no track was clicked, -1 is returned
+        """
         for index, button in enumerate(self.tracks):
-            if self.check_track_input(mouse_position=mouse_position, index=index):
-                return True
+            if button.check_for_input(mouse_position) and button.highlighted:
+                return index
+        return -1
 
-        return False
-
-    def check_track_input(self, mouse_position: tuple[int, int], index: int) -> bool:
-        button = self.tracks[index]
-        return button.check_for_input(mouse_position) and button.highlighted
+            
 
     def check_home_track_input(
         self, mouse_position: tuple[int, int], player: Player
@@ -372,4 +373,4 @@ class GraphicsManager:
 
     @staticmethod
     def render_background(screen: pygame.Surface):
-        screen.blit(BACKGROUND, (0, 0))
+        screen.blit(config.BACKGROUND, (0, 0))

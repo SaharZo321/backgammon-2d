@@ -17,6 +17,7 @@ from typing import Callable
 
 def local_client(screen: pygame.Surface, clock: pygame.time.Clock):
     run = True
+    options = False
     player1_color = pygame.Color(100, 100, 100)
     player2_color = pygame.Color(150, 100, 100)
     graphics = GraphicsManager(
@@ -55,8 +56,13 @@ def local_client(screen: pygame.Surface, clock: pygame.time.Clock):
         nonlocal highlighted_indexes
         highlighted_indexes = get_movable_pieces()
 
-    def settings_button_click():
-        options_menu(screen, clock)
+    def open_options():
+        nonlocal options
+        options = True
+
+    def close_options():
+        nonlocal options
+        options = False
 
     highlighted_indexes = get_movable_pieces()
 
@@ -96,7 +102,7 @@ def local_client(screen: pygame.Surface, clock: pygame.time.Clock):
     )
 
     SETTINGS_BUTTON = TextButton(
-        background_image=config.SETTINGS_ICON,
+        background_image=config.OPTIONS_ICON,
         position=(
             screen.get_width() - 45,
             45,
@@ -105,13 +111,16 @@ def local_client(screen: pygame.Surface, clock: pygame.time.Clock):
         font=get_font(50),
         base_color=config.BUTTON_COLOR,
         hovering_color=config.BUTTON_HOVER_COLOR,
-        on_click=settings_button_click,
+        on_click=open_options,
     )
 
     DONE_BUTTON.toggle(disabled=current_state.current_turn == Player.player1)
     UNDO_BUTTON.toggle(disabled=True)
 
-    game_buttons = [DONE_BUTTON, UNDO_BUTTON, LEAVE_BUTTON, SETTINGS_BUTTON]
+    game_buttons = [DONE_BUTTON, UNDO_BUTTON]
+    always_on_buttons = [LEAVE_BUTTON, SETTINGS_BUTTON]
+
+    all_buttons = game_buttons + always_on_buttons
 
     def is_my_turn() -> bool:
         return current_state.current_turn == Player.player1
@@ -139,24 +148,29 @@ def local_client(screen: pygame.Surface, clock: pygame.time.Clock):
 
         graphics.highlight_tracks(highlighted_indexes)
 
-        if server.local_is_playing() and (
-            (
-                is_my_turn()
-                and (
-                    graphics.check_tracks_input(mouse_position=MOUSE_POSITION)
-                    or graphics.check_home_track_input(
-                        mouse_position=MOUSE_POSITION, player=backgammon.current_turn
+        if (
+            not options
+            and server.local_is_playing()
+            and (
+                (
+                    is_my_turn()
+                    and (
+                        graphics.check_track_input(mouse_position=MOUSE_POSITION) != -1
+                        or graphics.check_home_track_input(
+                            mouse_position=MOUSE_POSITION,
+                            player=backgammon.current_turn,
+                        )
                     )
                 )
+                or any(button.check_for_input(MOUSE_POSITION) for button in all_buttons)
             )
-            or any(button.check_for_input(MOUSE_POSITION) for button in game_buttons)
         ):
             cursor = pygame.SYSTEM_CURSOR_HAND
 
         DONE_BUTTON.toggle(disabled=not is_my_turn() or not backgammon.is_turn_done())
         UNDO_BUTTON.toggle(disabled=not backgammon.has_history() or not is_my_turn())
 
-        for button in game_buttons:
+        for button in all_buttons:
             button.change_color(MOUSE_POSITION)
             button.update(screen)
 
@@ -166,24 +180,18 @@ def local_client(screen: pygame.Surface, clock: pygame.time.Clock):
 
             if (
                 event.type == pygame.MOUSEBUTTONDOWN
+                and not options
                 and server.local_is_playing()
-                and LEAVE_BUTTON.check_for_input(MOUSE_POSITION)
             ):
-                LEAVE_BUTTON.click()
-
-            if (
-                event.type == pygame.MOUSEBUTTONDOWN
-                and server.local_is_playing()
-                and is_my_turn()
-            ):
-
-                for button in game_buttons:
-                    if button is LEAVE_BUTTON:
-                        continue
+                for button in always_on_buttons:
                     if button.check_for_input(mouse_position=MOUSE_POSITION):
                         button.click()
 
-                did_hit_target = False
+                if is_my_turn():
+                    for button in game_buttons:
+                        if button.check_for_input(mouse_position=MOUSE_POSITION):
+                            button.click()
+
                 if graphics.check_home_track_input(
                     mouse_position=MOUSE_POSITION, player=backgammon.current_turn
                 ):
@@ -191,54 +199,52 @@ def local_client(screen: pygame.Surface, clock: pygame.time.Clock):
                         move_type=MoveType.bear_off, start=last_clicked_index, end=24
                     )
                     current_state = server.local_move(move=move)
-                    # backgammon.bear_off(position=clicked_index)
+                    last_clicked_index = -1
 
-                for index in range(24):
-                    if graphics.check_track_input(
-                        mouse_position=MOUSE_POSITION, index=index
-                    ):
-                        did_hit_target = True
+                index = graphics.check_track_input(mouse_position=MOUSE_POSITION)
+                if index != -1:  # clicked on track
+                    if (
+                        last_clicked_index == -1
+                        and backgammon.get_captured_pieces() == 0
+                    ):  # clicked on a movable piece
+                        last_clicked_index = index
+                        highlighted_indexes = backgammon.get_possible_tracks(
+                            last_clicked_index
+                        )
+                        print(highlighted_indexes)
 
-                        if (
-                            last_clicked_index == -1
-                            and backgammon.get_captured_pieces() == 0
-                        ):
-                            last_clicked_index = index
-                            highlighted_indexes = backgammon.get_possible_tracks(
-                                last_clicked_index
+                    else:
+                        if backgammon.get_captured_pieces() > 0:
+                            move = Move(
+                                move_type=MoveType.leave_bar,
+                                start=backgammon.get_start_position(),
+                                end=index,
                             )
-                            print(highlighted_indexes)
+                            current_state = server.local_move(move=move)
 
                         else:
-                            if backgammon.get_captured_pieces() > 0:
-                                move = Move(
-                                    move_type=MoveType.leave_bar,
-                                    start=backgammon.get_start_position(),
-                                    end=index,
-                                )
-                                current_state = server.local_move(move=move)
-                                # backgammon.leave_bar(end=index)
+                            move = Move(
+                                move_type=MoveType.normal_move,
+                                start=last_clicked_index,
+                                end=index,
+                            )
+                            current_state = server.local_move(move=move)
 
-                            else:
-                                move = Move(
-                                    move_type=MoveType.normal_move,
-                                    start=last_clicked_index,
-                                    end=index,
-                                )
-                                current_state = server.local_move(move=move)
-                                # backgammon.make_move(start=last_clicked_index, end=index)
+                        # a piece had been moved
+                        last_clicked_index = -1
+                        highlighted_indexes = backgammon.get_movable_pieces()
 
-                            # a piece had been moved
-                            highlighted_indexes = backgammon.get_movable_pieces()
-                            last_clicked_index = -1
-
-                last_clicked_index = -1 if not did_hit_target else last_clicked_index
-                print(last_clicked_index)
+                    print(last_clicked_index)
 
         if server.local_is_alone():
+            close_options()
             render_waiting(screen=screen, leave=leave_button_click)
 
-        pygame.mouse.set_cursor(cursor)
+        if options:
+            options_menu(screen=screen, close=close_options)
+        else:
+            pygame.mouse.set_cursor(cursor)
+
         pygame.display.flip()
 
 
@@ -261,7 +267,7 @@ def render_waiting(screen: pygame.Surface, leave: Callable[[], None]) -> None:
     PLAYER2_TEXT_RECT = PLAYER2_TEXT.get_rect(center=(get_mid_width(), 200))
 
     screen.blit(PLAYER2_TEXT, PLAYER2_TEXT_RECT)
-    
+
     WATING_TEXT = OutlineText.render(
         text="WATING",
         font=get_font(80),

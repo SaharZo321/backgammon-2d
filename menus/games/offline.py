@@ -1,6 +1,6 @@
 import pygame
 import pygame.gfxdraw
-from config import FRAMERATE, BUTTON_COLOR, BUTTON_HOVER_COLOR, SETTINGS_ICON
+from config import FRAMERATE, BUTTON_COLOR, BUTTON_HOVER_COLOR, OPTIONS_ICON
 from graphics.graphics_manager import GraphicsManager, get_font
 from backgammon.backgammon import Backgammon
 from graphics.button import Button
@@ -12,33 +12,42 @@ import math
 
 def offline_game(screen: pygame.Surface, clock: pygame.time.Clock):
     run = True
+    options = False
     player1_color = pygame.Color(100, 100, 100)
     player2_color = pygame.Color(150, 100, 100)
     graphics = GraphicsManager(
         screen=screen, player1_color=player1_color, player2_color=player2_color
     )
     backgammon = Backgammon()
-    clicked_index = -1
+    last_clicked_index = -1
+
+    def open_options():
+        nonlocal options
+        options = True
+
+    def close_options():
+        nonlocal options
+        options = False
 
     def leave_button_click():
         nonlocal run
         run = False
 
     def done_button_click():
+        if backgammon.is_game_over():
+            winner = backgammon.get_winner()
+            print(winner)
+            backgammon.set_winning_score(winner)
+            backgammon.new_game()
+            return
+        
         backgammon.switch_turn()
         DONE_BUTTON.toggle()
-        if backgammon.is_game_over():
-            print(backgammon.get_winner())
-            nonlocal run
-            run = False
 
     def undo_button_click():
         backgammon.undo()
         nonlocal highlighted_indexes
         highlighted_indexes = backgammon.get_movable_pieces()
-
-    def settings_button_click():
-        options_menu(screen, clock)
 
     highlighted_indexes = backgammon.get_movable_pieces()
 
@@ -78,7 +87,7 @@ def offline_game(screen: pygame.Surface, clock: pygame.time.Clock):
     )
 
     SETTINGS_BUTTON = TextButton(
-        background_image=SETTINGS_ICON,
+        background_image=OPTIONS_ICON,
         position=(
             screen.get_width() - 45,
             45,
@@ -87,7 +96,7 @@ def offline_game(screen: pygame.Surface, clock: pygame.time.Clock):
         font=get_font(50),
         base_color=BUTTON_COLOR,
         hovering_color=BUTTON_HOVER_COLOR,
-        on_click=settings_button_click,
+        on_click=open_options,
     )
 
     DONE_BUTTON.toggle()
@@ -102,19 +111,18 @@ def offline_game(screen: pygame.Surface, clock: pygame.time.Clock):
         MOUSE_POSITION = pygame.mouse.get_pos()
 
         GraphicsManager.render_background(screen=screen)
-        
+
         graphics.render_board(game_state=backgammon.get_state())
 
-        if clicked_index == -1:
+        if last_clicked_index == -1:
             if backgammon.get_captured_pieces() > 0:
                 highlighted_indexes = backgammon.get_bar_leaving_positions()
             else:
                 highlighted_indexes = backgammon.get_movable_pieces()
 
-
         graphics.highlight_tracks(highlighted_indexes)
-        if (
-            graphics.check_tracks_input(mouse_position=MOUSE_POSITION)
+        if not options and (
+            graphics.check_track_input(mouse_position=MOUSE_POSITION) != -1
             or graphics.check_home_track_input(
                 mouse_position=MOUSE_POSITION, player=backgammon.current_turn
             )
@@ -132,47 +140,44 @@ def offline_game(screen: pygame.Surface, clock: pygame.time.Clock):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 quit()
-            if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.type == pygame.MOUSEBUTTONDOWN and not options:
 
                 for button in game_buttons:
                     if button.check_for_input(mouse_position=MOUSE_POSITION):
                         button.click()
 
-                did_hit_target = False
                 if graphics.check_home_track_input(
                     mouse_position=MOUSE_POSITION, player=backgammon.current_turn
                 ):
-                    backgammon.bear_off(position=clicked_index)
+                    backgammon.bear_off(position=last_clicked_index)
+                    last_clicked_index = -1
 
-                for index in range(24):
-                    if graphics.check_track_input(
-                        mouse_position=MOUSE_POSITION, index=index
-                    ):
-                        did_hit_target = True
+                index = graphics.check_track_input(mouse_position=MOUSE_POSITION)
+                if index != -1:
 
-                        if (
-                            clicked_index == -1
-                            and backgammon.get_captured_pieces() == 0
-                        ):
-                            clicked_index = index
-                            highlighted_indexes = backgammon.get_possible_tracks(
-                                clicked_index
-                            )
-                            print(highlighted_indexes)
+                    if last_clicked_index == -1 and backgammon.get_captured_pieces() == 0:
+                        last_clicked_index = index
+                        highlighted_indexes = backgammon.get_possible_tracks(
+                            last_clicked_index
+                        )
+                        print(highlighted_indexes)
+
+                    else:
+                        if backgammon.get_captured_pieces() > 0:
+                            backgammon.leave_bar(end=index)
 
                         else:
-                            if backgammon.get_captured_pieces() > 0:
-                                backgammon.leave_bar(end=index)
+                            backgammon.make_move(start=last_clicked_index, end=index)
 
-                            else:
-                                backgammon.make_move(start=clicked_index, end=index)
+                        # a piece had been moved
+                        highlighted_indexes = backgammon.get_movable_pieces()
+                        last_clicked_index = -1
 
-                            # a piece had been moved
-                            highlighted_indexes = backgammon.get_movable_pieces()
-                            clicked_index = -1
+                    print(last_clicked_index)
 
-                clicked_index = -1 if not did_hit_target else clicked_index
-                print(clicked_index)
+        if options:
+            options_menu(screen=screen, close=close_options)
+        else:
+            pygame.mouse.set_cursor(cursor)
 
-        pygame.mouse.set_cursor(cursor)
         pygame.display.flip()
