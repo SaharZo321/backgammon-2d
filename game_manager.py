@@ -1,6 +1,6 @@
 import pygame
 import sys
-from config import RESOLUTION
+import config
 
 
 class GameManager:
@@ -12,7 +12,8 @@ class GameManager:
         pygame.font.init()
         pygame.display.set_caption("Backgammon")
         self.clock = pygame.time.Clock()
-        self.screen = pygame.display.set_mode((RESOLUTION[0], RESOLUTION[1]))
+        self.screen = pygame.display.set_mode(config.RESOLUTION)
+        pygame.display.set_icon(config.ICON)
 
     @staticmethod
     def quit():

@@ -15,3 +15,6 @@ BACKGROUND = pygame.transform.scale(
 OPTIONS_ICON = pygame.transform.scale(
     pygame.image.load(asset(os.path.join("assets", "settings.png"))), (60, 60)
 )
+ICON = pygame.transform.scale(
+    pygame.image.load(asset(os.path.join("assets", "backgammon.png"))), (60, 60)
+)
