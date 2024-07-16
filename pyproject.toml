@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "backgammon"
+version = "1.0.0"
+description = "Play backgammon with your beloved ones (including yourself)"
+authors = ["Sahar Zolberg <saharz321@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+pygame = "^2.6.0"
+ipaddress = "^1.0.23"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
