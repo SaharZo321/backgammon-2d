@@ -10,21 +10,20 @@ from models.player import Player
 from models.move import Move, MoveType
 from models.game_state import GameState
 from enum import Enum
-
-# from netifaces import interfaces, ifaddresses, AF_INET
-
-
-# def ip4_addresses() -> list[str]:
-#     ip_list = []
-#     for interface in interfaces():
-#         for link in ifaddresses(interface)[AF_INET]:
-#             ip_list.append(link["addr"])
-#     return ip_list
+import psutil
+import ipaddress
 
 
-def _get_ip_address():
-    ip = socket.gethostbyname(socket.gethostname())
-    return ip
+def ip4_addresses() -> list[str]:
+    ip_list = []
+    interfaces = psutil.net_if_addrs()
+    for if_name in interfaces:
+        interface = interfaces[if_name]
+        for s in interface:
+            if s.family == socket.AF_INET and ipaddress.ip_address(s.address).is_private:
+                ip_list.append(s.address)
+    
+    return ip_list
 
 
 class ServerFlags(Enum):
@@ -39,6 +38,7 @@ class BGServer:
     _event: Event
     _game: OnlineBackgammon
     _server_thread: Thread
+    _server_sockets: list[socket.socket]
     _client_threads: list[Thread]
     _ip: list[str]
     _port: int
@@ -56,9 +56,9 @@ class BGServer:
         self._buffer_size = buffer_size
         self._game = OnlineBackgammon()
         self._client_threads = []
-
-        addresses = [_get_ip_address()]
-        print(addresses)
+        self.running = False
+        addresses = ip4_addresses()
+        print(ip4_addresses())
         self._ip = addresses
         self._port = port
 
@@ -72,26 +72,37 @@ class BGServer:
         return time.time() - self._starting_time
 
     def _server_setup(self) -> None:
-        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._server_sockets: list[socket.socket] = []
         try:
             for ip in self._ip:
                 address = (ip, self._port)
-                server_socket.bind(address)
+                try:
+                    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    server_socket.bind(address)
+                    self._server_sockets.append(server_socket)
+                    print(address, " was binded")
+                    server_socket.listen(1)
+                except:
+                    print(address, " is not valid")
         except socket.error as error:
             print(error)
 
-        server_socket.listen(1)
         print("Server has started, waiting for clients")
 
         while not self._event.is_set():
-            readable, writable, errored = select.select([server_socket], [], [], 0.2)
+            readable, writable, errored = select.select(self._server_sockets, [], [], 0.2)
             for r in readable:
-                if r is server_socket:
+                if any(thread.is_alive() for thread in self._client_threads):
+                    continue
+                if r in self._server_sockets:
+                    server_socket: socket.socket = r
                     connection, address = server_socket.accept()
-                    print(address, " has connected to the server")
+                    print(address, " has connected to the server via socket: ", server_socket.getsockname())
                     self._check_client_connection_threaded(connection=connection)
 
-        server_socket.close()
+        for s in self._server_sockets:
+            s.close()
+        
 
     def stop(self) -> None:
         self._event.set()
@@ -118,7 +129,6 @@ class BGServer:
                     break
 
                 data = pickle.loads(raw_data)
-                game = self._get_game()
                 if data == ServerFlags.GET_GAME_STATE:
                     pass
                 elif data == ServerFlags.UNDO:
