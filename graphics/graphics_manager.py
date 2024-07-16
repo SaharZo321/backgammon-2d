@@ -4,6 +4,8 @@ import math
 from config import RESOLUTION, BACKGROUND
 from graphics.track_button import TrackButton
 from models.player import Player
+from models.game_state import GameState
+from graphics.outline_text import OutlineText
 
 SCREEN_WIDTH, SCREEN_HEIGHT = RESOLUTION
 
@@ -170,9 +172,14 @@ class GraphicsManager:
             self.screen, center[0], center[1], math.floor(radius / 2), (0, 0, 0)
         )
 
-    def render_board(
-        self, board: list[int], bar: dict[Player, int], home: dict[Player, int]
-    ):
+    def render_board(self, game_state: GameState):
+
+        board = game_state.board
+        bar = game_state.bar
+        home = game_state.home
+        score = game_state.score
+        dice = game_state.dice
+        current_turn = game_state.current_turn
 
         pygame.draw.rect(
             self.screen, "brown", (self._SIDE_PADDING, 0, self._SIZE, self._SIZE)
@@ -205,6 +212,46 @@ class GraphicsManager:
         self.render_bar_pieces(bar=bar)
 
         self.render_home(home=home)
+
+        self.render_dice(dice=dice)
+
+        self.render_score(score=score)
+        
+        self.render_turn(current_turn=current_turn)
+
+    
+    def render_turn(self, current_turn: Player):
+        TURN_TEXT = OutlineText.render(
+            text=str("Player1" if current_turn == Player.player1 else "Player2"),
+            font=get_font(50),
+            gfcolor=pygame.Color("white"),
+            ocolor=pygame.Color("black"),
+        )
+        turn_center = (math.floor(self._HOME_RECT.left / 2), 130)
+        TURN_TEXT_RECT = TURN_TEXT.get_rect(center=turn_center)
+        self.screen.blit(TURN_TEXT, TURN_TEXT_RECT)
+    
+    def render_dice(self, dice: tuple[int, int]):
+        DICE_TEXT = OutlineText.render(
+            text=str(dice[0]) + " " + str(dice[1]),
+            font=get_font(70),
+            gfcolor=pygame.Color("white"),
+            ocolor=pygame.Color("black"),
+        )
+        buttons_center = math.floor((self.RECT.right + self.screen.get_width()) / 2)
+        DICE_TEXT_RECT = DICE_TEXT.get_rect(center=(buttons_center, 560))
+        self.screen.blit(DICE_TEXT, DICE_TEXT_RECT)
+
+    def render_score(self, score: dict[Player, int]):
+        SCORE_TEXT = OutlineText.render(
+            text=str(str(score[Player.player1]) + " : " + str(score[Player.player2])),
+            font=get_font(70),
+            gfcolor=pygame.Color("white"),
+            ocolor=pygame.Color("black"),
+        )
+        score_center = (math.floor(self._HOME_RECT.left / 2), 60)
+        SCORE_TEXT_RECT = SCORE_TEXT.get_rect(center=score_center)
+        self.screen.blit(SCORE_TEXT, SCORE_TEXT_RECT)
 
     def render_tracks(self) -> None:
         for index, rect in enumerate(self.top_tracks_rect):

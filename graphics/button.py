@@ -6,7 +6,6 @@ import math
 
 
 class Button:
-    # image: pygame.Surface
     position: tuple[int, int]
     disabled: bool
     text_input: str
@@ -60,19 +59,15 @@ class Button:
         self._text_rect = self._text.get_rect(
             center=(self.position[0], self.position[1])
         )
-        # self.image = background_image
-        # if background_image is None:
-        #     self.image = self._text
-
-        self._rect = self._text_rect.scale_by(1.2, 1.1)
+        scaley = 1.1
+        scalex = ((self._text_rect.height*scaley - self._text_rect.height)*4 + self._text_rect.width) / self._text_rect.width
+        self._rect = self._text_rect.scale_by(scalex, scaley)
         self._on_click = on_click
 
     def click(self):
         self._on_click()
 
     def update(self, screen: pygame.Surface) -> None:
-        # if self.image is not None:
-        #     screen.blit(self.image, self._rect)
         br = (
             self._border_radius
             if self._border_radius is not None

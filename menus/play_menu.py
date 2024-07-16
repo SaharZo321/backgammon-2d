@@ -1,8 +1,9 @@
 import pygame
 from graphics.text_button import TextButton
 from graphics.graphics_manager import get_font, get_mid_width
-from menus.offline import offline_game
-from menus.bot import bot_game
+from menus.games.offline import offline_game
+from menus.games.bot import bot_game
+from menus.online_menu.online import online_menu
 from config import FRAMERATE, BUTTON_COLOR, BUTTON_HOVER_COLOR
 from game_manager import GameManager
 from graphics.graphics_manager import GraphicsManager
@@ -20,15 +21,18 @@ def play_menu(screen: pygame.Surface, clock: pygame.time.Clock) -> None:
         nonlocal run
         run = False
 
-    def online_button_click():
+    def bot_button_click():
         bot_game(screen, clock)
         nonlocal run
         run = False
 
+    def online_button_click():
+        online_menu(screen, clock)
+       
     ONLINE_BUTTON = TextButton(
         background_image=None,
-        position=(get_mid_width(), 270),
-        text_input="PLAY ONLINE",
+        position=(get_mid_width(), 180),
+        text_input="PLAY ON LAN",
         font=get_font(75),
         base_color=BUTTON_COLOR,
         hovering_color=BUTTON_HOVER_COLOR,
@@ -36,11 +40,23 @@ def play_menu(screen: pygame.Surface, clock: pygame.time.Clock) -> None:
         outline_size=1,
         on_click=online_button_click,
     )
+    
+    BOT_BUTTON = TextButton(
+        background_image=None,
+        position=(get_mid_width(), 330),
+        text_input="PLAY AGAINST BOT",
+        font=get_font(75),
+        base_color=BUTTON_COLOR,
+        hovering_color=BUTTON_HOVER_COLOR,
+        outline_color=pygame.Color("black"),
+        outline_size=1,
+        on_click=bot_button_click,
+    )
 
     OFFLINE_BUTTON = TextButton(
         background_image=None,
-        position=(get_mid_width(), 420),
-        text_input="PLAY OFFLINE",
+        position=(get_mid_width(), 480),
+        text_input="PLAY 1v1",
         font=get_font(75),
         base_color=BUTTON_COLOR,
         hovering_color=BUTTON_HOVER_COLOR,
@@ -61,7 +77,7 @@ def play_menu(screen: pygame.Surface, clock: pygame.time.Clock) -> None:
         on_click=back_button_click,
     )
 
-    buttons: list[TextButton] = [ONLINE_BUTTON, OFFLINE_BUTTON, BACK_BUTTON]
+    buttons: list[TextButton] = [ONLINE_BUTTON, BOT_BUTTON, OFFLINE_BUTTON, BACK_BUTTON]
 
     while run:
         screen.fill("black")

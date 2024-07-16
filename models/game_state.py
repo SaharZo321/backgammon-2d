@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from models.player import Player
+from typing import Self
 
 class GameState(BaseModel):
     board: list[int]
@@ -8,3 +9,5 @@ class GameState(BaseModel):
     current_turn: Player
     dice: tuple[int,int]
     moves_left: list[int]
+    score: dict[Player, int]
+    history: list[Self]

@@ -1,12 +1,19 @@
 import pygame
 from graphics.text_button import TextButton
 from graphics.graphics_manager import get_font, get_mid_width
-from config import FRAMERATE, BUTTON_COLOR, BUTTON_HOVER_COLOR
+from config import FRAMERATE, BUTTON_COLOR, BUTTON_HOVER_COLOR, RESOLUTION
 from game_manager import GameManager
 from graphics.graphics_manager import GraphicsManager
 
 
 def options_menu(screen: pygame.Surface, clock: pygame.time.Clock) -> None:
+
+    menu_surface = pygame.Surface(size=RESOLUTION, flags=pygame.SRCALPHA, depth=32)
+    menu_surface.convert_alpha()
+    menu_surface.fill(pygame.Color(0, 0, 0, 200))
+    screen.blit(source=menu_surface, dest=(0, 0))
+    
+    
     run = True
 
     def back_button_click():
@@ -42,8 +49,9 @@ def options_menu(screen: pygame.Surface, clock: pygame.time.Clock) -> None:
     buttons: list[TextButton] = [VISUALS_BUTTON, BACK_BUTTON]
 
     while run:
-        screen.fill("black")
-        GraphicsManager.render_background(screen=screen)
+        # menu_surface.fill(pygame.Color(0, 0, 0, 0))
+        # GraphicsManager.render_background(screen=screen)
+        # screen.blit(source=menu_surface, dest=(0, 0))
 
         clock.tick(FRAMERATE)
         MENU_MOUSE_POSITION = pygame.mouse.get_pos()
@@ -60,4 +68,4 @@ def options_menu(screen: pygame.Surface, clock: pygame.time.Clock) -> None:
                     if button.check_for_input(MENU_MOUSE_POSITION):
                         button.click()
 
-        pygame.display.update()
+        pygame.display.flip()

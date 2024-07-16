@@ -30,7 +30,7 @@ class BackgammonAI:
         score += cls.PIECE_BEARING_OFF * cls._evaluate_bearing_off(state=state)
 
         # Factor 5: Opponent's Bar
-        score += cls.BAR * cls._evaluate_opponents_bar(state=state)
+        score += cls.BAR * cls._evaluate_bar(state=state)
 
         return score
 
@@ -82,18 +82,23 @@ class BackgammonAI:
         home_range = range(18, 24) if piece_type == 1 else range(0, 6)
         for pos in home_range:
             if state.board[pos] * piece_type > 1:
-                score += (pos % 6) * 15  # Reward closer pieces to bearing off
+                score += 30  # Reward closer pieces to bearing off
+            if state.board[pos] * piece_type == 1:
+                score -= 10
         score += (
-            state.home[state.current_turn] * 100
+            state.home[state.current_turn] * 50
         )  # High reward for borne off pieces
         return score
 
     @staticmethod
-    def _evaluate_opponents_bar(state: GameState):
+    def _evaluate_bar(state: GameState):
         score = 0
         score += (
             state.bar[Player.other(state.current_turn)] * 20
-        )  # Reward for opponent's pieces on the bar
+        ) # Reward for opponent's pieces on the bar
+        score -= (
+            state.bar[state.current_turn] * 20
+        )  # Penalize for bot's pieces on the bar
         return score
 
     @classmethod
@@ -132,17 +137,19 @@ class BackgammonAI:
 
         if number_of_moves == 0:
             return ScoredMoves(
-                score=cls._evaluate_game_state(game.to_state()),
+                score=cls._evaluate_game_state(game.get_state()),
                 moves=[],
             )
 
         if game.get_captured_pieces() > 0:  # AI has captured pieces
             best_scored_moves = ScoredMoves(moves=[], score=-1000)
             leaving_bar_pos = game.get_bar_leaving_positions()
+            print(leaving_bar_pos)
+            print("hi")
             for end in leaving_bar_pos:
                 game.leave_bar(end)
                 scored_moves = cls.get_best_move(game=game)
-                if scored_moves.score > best_scored_moves.score:
+                if scored_moves.score >= best_scored_moves.score:
                     best_scored_moves = scored_moves
                     best_scored_moves.moves.append(
                         Move(
@@ -157,7 +164,7 @@ class BackgammonAI:
         current_possible_moves = cls._get_all_possible_moves(game)
         if len(current_possible_moves) == 0:
             return ScoredMoves(
-                score=cls._evaluate_game_state(game.to_state()), moves=[]
+                score=cls._evaluate_game_state(game.get_state()), moves=[]
             )
 
         best_scored_moves = ScoredMoves(moves=[], score=-1000)
@@ -170,7 +177,7 @@ class BackgammonAI:
             else:
                 game.make_move(move.start, move.end)
             scored_moves = cls.get_best_move(game=game)
-            if scored_moves.score > best_scored_moves.score:
+            if scored_moves.score >= best_scored_moves.score:
                 best_scored_moves = scored_moves
                 best_scored_moves.moves.append(
                     Move(

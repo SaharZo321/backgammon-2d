@@ -1,5 +1,7 @@
 import pygame
 
+NETWORK_BUFFER = 2048*2
+GAME_PORT = 6324
 RESOLUTION: tuple[int, int] = (1280, 720)
 FRAMERATE: int = 60
 BUTTON_COLOR = pygame.Color(200, 0, 0)

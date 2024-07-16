@@ -35,8 +35,7 @@ def main_menu(screen: pygame.Surface, clock: pygame.time.Clock) -> None:
         on_click=play_button_click
     )
     
-    OPTIONS_BUTTON = TextButton(
-        background_image=None,
+    OPTIONS_BUTTON = Button(
         position=(get_mid_width(), 450),
         text_input="OPTIONS",
         font=get_font(75),
