@@ -371,4 +371,4 @@ class OnlineBackgammon:
         if self.game.is_game_over():
             winner = self.game.get_winner()
             self.game.set_winning_score(winner=winner)
-        self.game.new_game()
+        self.game.new_game(winner=winner)
