@@ -20,56 +20,90 @@ def get_mid_width() -> int:
 
 class GraphicsManager:
     screen: pygame.Surface
+    surface: pygame.Surface
     top_tracks_rect: list[pygame.Rect]
     bottom_tracks_rect: list[pygame.Rect]
     tracks: list[TrackButton]
     home_tracks = dict[Player, TrackButton]
-    player_colors: dict[Player, pygame.Color]
 
-    _SIZE = SCREEN_HEIGHT
-    _SIDE_PADDING = (SCREEN_WIDTH - SCREEN_HEIGHT) / 2
-    _TRIANGLE_HEIGHT = math.floor(_SIZE * 0.4)
-    _BOARD_PADDING = _SIZE * 0.03
-    _SIDE_DIMENSIONS = (_SIZE / 2 - 2 * _BOARD_PADDING, _SIZE - 2 * _BOARD_PADDING)
-    _LEFT_SIDE_POSITION = (_SIDE_PADDING + _BOARD_PADDING, _BOARD_PADDING)
-    _RIGHT_SIDE_POSITION = (_SIDE_PADDING + _SIZE / 2 + _BOARD_PADDING, _BOARD_PADDING)
-    _LEFT_SIDE_RECT = pygame.Rect(_LEFT_SIDE_POSITION + _SIDE_DIMENSIONS)
-    _RIGHT_SIDE_RECT = pygame.Rect(_RIGHT_SIDE_POSITION + _SIDE_DIMENSIONS)
-    _MINI_RECT = pygame.Rect(
-        0, 0, math.floor(_LEFT_SIDE_RECT.width / 6), _TRIANGLE_HEIGHT
-    )
-    _HOME_RECT = pygame.Rect(
-        _SIDE_PADDING - SCREEN_WIDTH * 0.05, 0, SCREEN_WIDTH * 0.05, SCREEN_HEIGHT
-    )
-    _HOME_TRACK_PADDING = _HOME_RECT.width * 0.15
-    _HOME_TRACK_WIDTH = _HOME_RECT.width - 2 * _HOME_TRACK_PADDING
-    _HOME_TRACK_HEIGHT = SCREEN_HEIGHT * 0.4
-    _HOME_TRACK_TOP_RECT = pygame.Rect(
-        _HOME_RECT.left + _HOME_TRACK_PADDING,
-        _HOME_RECT.top + _HOME_TRACK_PADDING * 2,
-        _HOME_TRACK_WIDTH,
-        _HOME_TRACK_HEIGHT,
-    )
-    _HOME_TRACK_BOTTOM_RECT = pygame.Rect(
-        _HOME_RECT.left + _HOME_TRACK_PADDING,
-        _HOME_RECT.bottom - _HOME_TRACK_PADDING * 2 - _HOME_TRACK_HEIGHT,
-        _HOME_TRACK_WIDTH,
-        _HOME_TRACK_HEIGHT,
-    )
-
-    RECT = pygame.Rect(_HOME_RECT.left, 0, _HOME_RECT.width + _SIZE, _SIZE)
+    RECT: pygame.Rect
 
     def __init__(
         self,
         screen: pygame.Surface,
-        player1_color: pygame.Color,
-        player2_color: pygame.Color,
     ) -> None:
         self.screen = screen
-        self.player_colors = {
-            Player.player1: player1_color,
-            Player.player2: player2_color,
-        }
+
+        # postiion relative to screen
+        home_width = self.screen.get_height() * 0.1
+
+        self.RECT = pygame.Rect(
+            math.floor(
+                (self.screen.get_width() - (self.screen.get_height() + home_width)) / 2
+            ),
+            0,
+            math.floor(screen.get_height() + home_width),
+            screen.get_height(),
+        )
+
+        self.surface = pygame.Surface(self.RECT.size)
+
+        # position relative to self.surface
+        self._HOME_RECT = pygame.Rect(
+            0,
+            0,
+            home_width,
+            self.RECT.height,
+        )
+
+        self._BOARD_RECT = pygame.Rect(
+            self._HOME_RECT.right,
+            0,
+            self.RECT.height,
+            self.RECT.height,
+        )
+
+        self._PADDING = math.floor(self.RECT.height / 28)
+
+        self._SIDE_DIMENSIONS = (
+            math.floor(self.RECT.height / 2 - 2 * self._PADDING),
+            self.RECT.height - 2 * self._PADDING,
+        )
+
+        self._LEFT_SIDE_RECT = pygame.Rect(
+            (self._PADDING + self._BOARD_RECT.left, self._PADDING)
+            + self._SIDE_DIMENSIONS
+        )
+
+        self._RIGHT_SIDE_RECT = pygame.Rect(
+            (
+                self._BOARD_RECT.right - self._SIDE_DIMENSIONS[0] - self._PADDING,
+                self._PADDING,
+            )
+            + self._SIDE_DIMENSIONS
+        )
+
+        self._TRIANGLE_HEIGHT = math.floor(self.RECT.height * 0.4)
+        self._MINI_RECT = pygame.Rect(
+            0, 0, math.floor(self._LEFT_SIDE_RECT.width / 6), self._TRIANGLE_HEIGHT
+        )
+
+        self._HOME_TRACK_TOP_RECT = pygame.Rect(
+            (
+                math.floor(self._HOME_RECT.left + self._PADDING / 2),
+                self._HOME_RECT.top + self._PADDING,
+            )
+            + self._MINI_RECT.size
+        )
+        self._HOME_TRACK_BOTTOM_RECT = pygame.Rect(
+            (
+                math.floor(self._HOME_RECT.left + self._PADDING / 2),
+                self._HOME_RECT.bottom - self._PADDING - self._MINI_RECT.height,
+            )
+            + self._MINI_RECT.size
+        )
+
+        self._piece_radius = math.floor(self._MINI_RECT.width / 2 - 2)
         self.top_tracks_rect = []
         self.bottom_tracks_rect = []
         self.tracks = []
@@ -79,9 +113,11 @@ class GraphicsManager:
 
     def create_home_tracks(self) -> None:
         self.home_tracks = {
-            Player.player2: TrackButton(rect=self._HOME_TRACK_TOP_RECT, is_top=True),
+            Player.player2: TrackButton(
+                rect=self._HOME_TRACK_TOP_RECT, is_top=True, surface=self.surface, surface_rect=self.RECT 
+            ),
             Player.player1: TrackButton(
-                rect=self._HOME_TRACK_BOTTOM_RECT, is_top=False
+                rect=self._HOME_TRACK_BOTTOM_RECT, is_top=False, surface=self.surface, surface_rect=self.RECT
             ),
         }
 
@@ -116,8 +152,6 @@ class GraphicsManager:
                 return index
         return -1
 
-            
-
     def check_home_track_input(
         self, mouse_position: tuple[int, int], player: Player
     ) -> bool:
@@ -134,7 +168,11 @@ class GraphicsManager:
             )
             rect = pygame.Rect(NEW_RECT_POS, self._MINI_RECT.size)
             self.top_tracks_rect.append(rect)
-            self.tracks.append(TrackButton(rect=rect, is_top=True))
+            self.tracks.append(
+                TrackButton(
+                    rect=rect, is_top=True, surface=self.surface, surface_rect=self.RECT
+                )
+            )
 
         # top right RECT
         for i in range(6):
@@ -144,7 +182,11 @@ class GraphicsManager:
             )
             rect = pygame.Rect(NEW_RECT_POS, self._MINI_RECT.size)
             self.top_tracks_rect.append(rect)
-            self.tracks.append(TrackButton(rect=rect, is_top=True))
+            self.tracks.append(
+                TrackButton(
+                    rect=rect, is_top=True, surface=self.surface, surface_rect=self.RECT
+                )
+            )
 
         # bottom right RECT
         for i in range(6):
@@ -154,7 +196,14 @@ class GraphicsManager:
             )
             rect = pygame.Rect(NEW_RECT_POS, self._MINI_RECT.size)
             self.bottom_tracks_rect.append(rect)
-            self.tracks.append(TrackButton(rect=rect, is_top=False))
+            self.tracks.append(
+                TrackButton(
+                    rect=rect,
+                    is_top=False,
+                    surface=self.surface,
+                    surface_rect=self.RECT,
+                )
+            )
 
         # bottom left RECT
         for i in range(6):
@@ -164,16 +213,16 @@ class GraphicsManager:
             )
             rect = pygame.Rect(NEW_RECT_POS, self._MINI_RECT.size)
             self.bottom_tracks_rect.append(rect)
-            self.tracks.append(TrackButton(rect=rect, is_top=False))
+            self.tracks.append(
+                TrackButton(
+                    rect=rect,
+                    is_top=False,
+                    surface=self.surface,
+                    surface_rect=self.RECT,
+                )
+            )
 
-    def render_piece(self, center: tuple[int, int], color: pygame.Color, radius: int):
-        pygame.gfxdraw.filled_circle(self.screen, center[0], center[1], radius, color)
-        pygame.gfxdraw.aacircle(self.screen, center[0], center[1], radius, (0, 0, 0))
-        pygame.gfxdraw.aacircle(
-            self.screen, center[0], center[1], math.floor(radius / 2), (0, 0, 0)
-        )
-
-    def render_board(self, game_state: GameState):
+    def render_board(self, game_state: GameState, player_colors: dict[Player, pygame.Color], is_online: bool = False):
 
         board = game_state.board
         bar = game_state.bar
@@ -182,56 +231,65 @@ class GraphicsManager:
         dice = game_state.dice
         current_turn = game_state.current_turn
 
-        pygame.draw.rect(
-            self.screen, "brown", (self._SIDE_PADDING, 0, self._SIZE, self._SIZE)
-        )
+        # whole board + home
+        self.surface.fill("brown")
         side_color = pygame.Color(246, 224, 135)
-        pygame.draw.rect(
-            self.screen, side_color, self._LEFT_SIDE_POSITION + self._SIDE_DIMENSIONS
-        )
-        pygame.draw.rect(
-            self.screen, "black", self._LEFT_SIDE_POSITION + self._SIDE_DIMENSIONS, 2
-        )
-        pygame.draw.rect(
-            self.screen, side_color, self._RIGHT_SIDE_POSITION + self._SIDE_DIMENSIONS
-        )
-        pygame.draw.rect(
-            self.screen, "black", self._RIGHT_SIDE_POSITION + self._SIDE_DIMENSIONS, 2
-        )
+        pygame.draw.rect(self.surface, "black", (0, 0) + self.RECT.size, 2)
 
-        self.render_tracks()
+        # left side
+        pygame.draw.rect(self.surface, side_color, self._LEFT_SIDE_RECT)
+        pygame.draw.rect(self.surface, "black", self._LEFT_SIDE_RECT, 2)
 
-        all_rect = self.top_tracks_rect + self.bottom_tracks_rect
-        for index, pieces in enumerate(board):
-            player = Player.player1 if pieces > 0 else Player.player2
-            color = self.player_colors[player]
-            self.render_track_pieces(all_rect[index], color, abs(pieces), index < 12)
+        # right side
+        pygame.draw.rect(self.surface, side_color, self._RIGHT_SIDE_RECT)
+        pygame.draw.rect(
+            self.surface,
+            "black",
+            self._RIGHT_SIDE_RECT,
+            2,
+        )
 
         for button in self.tracks:
-            button.update(self.screen)
+            button.update()
+        
+        self.render_tracks()
 
-        self.render_bar_pieces(bar=bar)
+        self.render_pieces(board=board, player_colors=player_colors)
 
-        self.render_home(home=home)
+        self.render_bar_pieces(bar=bar, player_colors=player_colors)
+
+        self.render_home(home=home, player_colors=player_colors)
 
         self.render_dice(dice=dice)
 
-        self.render_score(score=score)
-        
-        self.render_turn(current_turn=current_turn)
+        self.render_score(score=score, player_colors=player_colors)
 
+        self.render_turn(current_turn=current_turn, is_online=is_online)
+
+        self.screen.blit(source=self.surface, dest=self.RECT.topleft)
+
+    def render_pieces(self, board: list[int], player_colors: pygame.Color):
+        all_rect = self.top_tracks_rect + self.bottom_tracks_rect
+        
+        for index, pieces in enumerate(board):
+            player = Player.player1 if pieces > 0 else Player.player2
+            color = player_colors[player]
+            self.render_track_pieces(all_rect[index], color, abs(pieces), index < 12, self._piece_radius)
     
-    def render_turn(self, current_turn: Player):
+    def render_turn(self, current_turn: Player, is_online: bool):
+        text = "Player1" if current_turn == Player.player1 else "Player2"
+        if is_online:
+            text = "YOU" if current_turn == Player.player1 else "OPPONENT"
         TURN_TEXT = OutlineText.render(
-            text=str("Player1" if current_turn == Player.player1 else "Player2"),
-            font=get_font(50),
+            text=text,
+            font=get_font(30),
             gfcolor=pygame.Color("white"),
             ocolor=pygame.Color("black"),
         )
-        turn_center = (math.floor(self._HOME_RECT.left / 2), 130)
+        turn_center = (math.floor(self.RECT.left / 2), 130)
         TURN_TEXT_RECT = TURN_TEXT.get_rect(center=turn_center)
         self.screen.blit(TURN_TEXT, TURN_TEXT_RECT)
-    
+
     def render_dice(self, dice: tuple[int, int]):
         DICE_TEXT = OutlineText.render(
             text=str(dice[0]) + " " + str(dice[1]),
@@ -239,20 +297,44 @@ class GraphicsManager:
             gfcolor=pygame.Color("white"),
             ocolor=pygame.Color("black"),
         )
-        buttons_center = math.floor((self.RECT.right + self.screen.get_width()) / 2)
-        DICE_TEXT_RECT = DICE_TEXT.get_rect(center=(buttons_center, 560))
+        buttons_center = (
+            math.floor((self.RECT.right + self.screen.get_width()) / 2),
+            560,
+        )
+        DICE_TEXT_RECT = DICE_TEXT.get_rect(center=buttons_center)
         self.screen.blit(DICE_TEXT, DICE_TEXT_RECT)
 
-    def render_score(self, score: dict[Player, int]):
-        SCORE_TEXT = OutlineText.render(
-            text=str(str(score[Player.player1]) + " : " + str(score[Player.player2])),
+    def render_score(self, score: dict[Player, int], player_colors: dict[Player, pygame.Color]):
+        COLON_SCORE_TEXT = OutlineText.render(
+            text=":",
             font=get_font(70),
             gfcolor=pygame.Color("white"),
             ocolor=pygame.Color("black"),
         )
-        score_center = (math.floor(self._HOME_RECT.left / 2), 60)
-        SCORE_TEXT_RECT = SCORE_TEXT.get_rect(center=score_center)
-        self.screen.blit(SCORE_TEXT, SCORE_TEXT_RECT)
+        score_center = math.floor(self.RECT.left / 2), 60
+        COLON_SCORE_TEXT_RECT = COLON_SCORE_TEXT.get_rect(center=score_center)
+        self.screen.blit(COLON_SCORE_TEXT, COLON_SCORE_TEXT_RECT)
+        
+        PLAYER1_SCORE_TEXT = OutlineText.render(
+            text=str(score[Player.player1]),
+            font=get_font(70),
+            gfcolor=player_colors[Player.player1],
+            ocolor=pygame.Color("black"),
+        )
+        player1_midleft = math.floor(COLON_SCORE_TEXT_RECT.right + 10), 60
+        PLAYER1_SCORE_TEXT_RECT = PLAYER1_SCORE_TEXT.get_rect(midleft=player1_midleft)
+        self.screen.blit(PLAYER1_SCORE_TEXT, PLAYER1_SCORE_TEXT_RECT)
+        
+        PLAYER2_SCORE_TEXT = OutlineText.render(
+            text=str(score[Player.player2]),
+            font=get_font(70),
+            gfcolor=player_colors[Player.player2],
+            ocolor=pygame.Color("black"),
+        )
+        player2_midright = math.floor(COLON_SCORE_TEXT_RECT.left - 10), 60
+        PLAYER2_SCORE_TEXT_RECT = PLAYER2_SCORE_TEXT.get_rect(midright=player2_midright)
+        self.screen.blit(PLAYER2_SCORE_TEXT, PLAYER2_SCORE_TEXT_RECT)
+        
 
     def render_tracks(self) -> None:
         for index, rect in enumerate(self.top_tracks_rect):
@@ -260,21 +342,25 @@ class GraphicsManager:
             second = rect.topright
             third = (math.floor((rect.right + rect.left) / 2), rect.bottom)
             color = (0, 0, 0) if index % 2 == 0 else (150, 0, 0)
-            pygame.gfxdraw.filled_polygon(self.screen, (first, second, third), color)
-            pygame.gfxdraw.aapolygon(self.screen, (first, second, third), (0, 0, 0))
+            pygame.gfxdraw.filled_polygon(self.surface, (first, second, third), color)
+            pygame.gfxdraw.aapolygon(self.surface, (first, second, third), (0, 0, 0))
 
         for index, rect in enumerate(self.bottom_tracks_rect):
             first = rect.bottomleft
             second = rect.bottomright
             third = (math.floor((rect.right + rect.left) / 2), rect.top)
             color = (0, 0, 0) if index % 2 == 0 else (150, 0, 0)
-            pygame.gfxdraw.filled_polygon(self.screen, (first, second, third), color)
-            pygame.gfxdraw.aapolygon(self.screen, (first, second, third), (0, 0, 0))
+            pygame.gfxdraw.filled_polygon(self.surface, (first, second, third), color)
+            pygame.gfxdraw.aapolygon(self.surface, (first, second, third), (0, 0, 0))
 
     def render_track_pieces(
-        self, rect: pygame.Rect, color: pygame.Color, number: int, is_top: bool
+        self,
+        rect: pygame.Rect,
+        color: pygame.Color,
+        number: int,
+        is_top: bool,
+        radius: int
     ):
-        radius = math.floor(rect.width * 0.45)
         for i in range(number):
             new_y = (
                 (rect.top + radius * (2 * i + 1))
@@ -284,46 +370,55 @@ class GraphicsManager:
             center = (rect.centerx, new_y)
             self.render_piece(center, color, radius)
 
-    def render_bar_pieces(self, bar: dict[Player, int]):
+    def render_piece(
+        self,
+        center: tuple[int, int],
+        color: pygame.Color,
+        radius: int,
+    ):
+        pygame.gfxdraw.filled_circle(self.surface, center[0], center[1], radius, color)
+        pygame.gfxdraw.aacircle(self.surface, center[0], center[1], radius, (0, 0, 0))
+        pygame.gfxdraw.aacircle(
+            self.surface, center[0], center[1], math.floor(radius / 2), (0, 0, 0)
+        )
+
+    def render_bar_pieces(self, bar: dict[Player, int], player_colors: pygame.Color):
         # player1
-        color = self.player_colors[Player.player1]
-        radius = math.floor(self._BOARD_PADDING * 1.1)
+        color = player_colors[Player.player1]
+        radius = self._piece_radius
         number = bar[Player.player1]
+        centery = math.floor((self._LEFT_SIDE_RECT.right + self._RIGHT_SIDE_RECT.left) / 2)
         for counter in range(number):
             counter_center = (
-                math.floor(SCREEN_WIDTH / 2),
+                centery, 
                 math.floor(
-                    (SCREEN_HEIGHT / 4 - radius * number) + (counter * 2 + 1) * radius
+                    (self.RECT.height / 4 - radius * number) + (counter * 2 + 1) * radius
                 ),
             )
             self.render_piece(counter_center, color, radius)
 
         # player2
-        color = self.player_colors[Player.player2]
-        radius = math.floor(self._BOARD_PADDING * 1.1)
+        color = player_colors[Player.player2]
         number = bar[Player.player2]
         for counter in range(number):
             counter_center = (
-                math.floor(SCREEN_WIDTH / 2),
+                centery, 
                 math.floor(
-                    (SCREEN_HEIGHT / 4 * 3 - radius * number)
+                    (self.RECT.height / 4 * 3 - radius * number)
                     + (counter * 2 + 1) * radius
                 ),
             )
             self.render_piece(counter_center, color, radius)
 
-    def render_home(self, home: dict[Player, int]) -> None:
-        pygame.draw.rect(surface=self.screen, color="brown", rect=self._HOME_RECT)
+    def render_home(self, home: dict[Player, int], player_colors: pygame.Color) -> None:
+
         pygame.draw.rect(
-            surface=self.screen, color="black", rect=self._HOME_RECT, width=2
-        )
-        pygame.draw.rect(
-            surface=self.screen, color="black", rect=self._HOME_RECT, width=2
+            surface=self.surface, color="black", rect=self._HOME_RECT, width=2
         )
 
         # top home rect player 2
         pygame.draw.rect(
-            surface=self.screen,
+            surface=self.surface,
             color="black",
             rect=self._HOME_TRACK_TOP_RECT,
             width=0,
@@ -332,7 +427,7 @@ class GraphicsManager:
 
         # bottom home rect player 1
         pygame.draw.rect(
-            surface=self.screen,
+            surface=self.surface,
             color="black",
             rect=self._HOME_TRACK_BOTTOM_RECT,
             width=0,
@@ -343,32 +438,32 @@ class GraphicsManager:
         piece_width = self._HOME_TRACK_TOP_RECT.width
         # render top pieces
         player = Player.player2
-        self.home_tracks[player].update(screen=self.screen)
+        self.home_tracks[player].update()
         for piece in range(home[player]):
-            color = self.player_colors[player]
+            color = player_colors[player]
             top = self._HOME_TRACK_TOP_RECT.top + piece * piece_height
             left = self._HOME_TRACK_TOP_RECT.left
             rect = pygame.Rect(left, top, piece_width, piece_height)
             pygame.draw.rect(
-                surface=self.screen, color=color, rect=rect, width=0, border_radius=2
+                surface=self.surface, color=color, rect=rect, width=0, border_radius=2
             )
             pygame.draw.rect(
-                surface=self.screen, color="black", rect=rect, width=1, border_radius=2
+                surface=self.surface, color="black", rect=rect, width=1, border_radius=2
             )
 
         # render bottom pieces
         player = Player.player1
-        self.home_tracks[player].update(screen=self.screen)
+        self.home_tracks[player].update()
         for piece in range(home[player]):
-            color = self.player_colors[player]
+            color = player_colors[player]
             top = self._HOME_TRACK_BOTTOM_RECT.bottom - (piece + 1) * piece_height
             left = self._HOME_TRACK_BOTTOM_RECT.left
             rect = pygame.Rect(left, top, piece_width, piece_height)
             pygame.draw.rect(
-                surface=self.screen, color=color, rect=rect, width=0, border_radius=2
+                surface=self.surface, color=color, rect=rect, width=0, border_radius=2
             )
             pygame.draw.rect(
-                surface=self.screen, color="black", rect=rect, width=1, border_radius=2
+                surface=self.surface, color="black", rect=rect, width=1, border_radius=2
             )
 
     @staticmethod

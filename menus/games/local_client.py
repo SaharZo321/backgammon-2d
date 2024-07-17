@@ -11,22 +11,24 @@ import math
 from models.player import Player
 from models.move import Move, MoveType
 from server.server import BGServer
-from game_manager import GameManager
+from game_manager import GameManager, SettingsKeys
 from typing import Callable
+from models.game_state import OnlineGameState, ColorConverter
 
 
 def local_client(screen: pygame.Surface, clock: pygame.time.Clock):
     run = True
     options = False
-    player1_color = pygame.Color(100, 100, 100)
-    player2_color = pygame.Color(150, 100, 100)
-    graphics = GraphicsManager(
-        screen=screen, player1_color=player1_color, player2_color=player2_color
+    graphics = GraphicsManager(screen=screen)
+
+    server = BGServer(
+        port=config.GAME_PORT,
+        buffer_size=config.NETWORK_BUFFER,
+        local_color=ColorConverter.pygame_to_pydantic(GameManager.get_setting(SettingsKeys.PIECE_COLOR)),
+        online_color=ColorConverter.pygame_to_pydantic(GameManager.get_setting(SettingsKeys.OPPONENT_COLOR)),
     )
 
-    server = BGServer(port=config.GAME_PORT, buffer_size=config.NETWORK_BUFFER)
-
-    current_state = server.get_game_state()
+    current_state = server.local_get_game_state()
 
     last_clicked_index = -1
 
@@ -42,17 +44,19 @@ def local_client(screen: pygame.Surface, clock: pygame.time.Clock):
         nonlocal run
         run = False
 
-    def done_button_click():
+    def save_state(state: OnlineGameState):
         nonlocal current_state
-        current_state = server.local_done()
+        current_state = state
+
+    def done_button_click():
+        save_state(server.local_done())
         DONE_BUTTON.toggle()
-        backgammon = server._get_game()
+        backgammon = Backgammon.from_state(current_state)
         if backgammon.is_game_over():
             print(backgammon.get_winner())
 
     def undo_button_click():
-        nonlocal current_state
-        current_state = server.local_undo()
+        save_state(server.local_undo())
         nonlocal highlighted_indexes
         highlighted_indexes = get_movable_pieces()
 
@@ -66,11 +70,12 @@ def local_client(screen: pygame.Surface, clock: pygame.time.Clock):
 
     highlighted_indexes = get_movable_pieces()
 
-    buttons_center = math.floor((GraphicsManager.RECT.right + screen.get_width()) / 2)
+    right_center = math.floor((graphics.RECT.right + screen.get_width()) / 2)
+    left_center = math.floor((graphics.RECT.left) / 2)
 
     DONE_BUTTON = TextButton(
         background_image=None,
-        position=(buttons_center, 300),
+        position=(right_center, 300),
         text_input="DONE",
         font=get_font(50),
         base_color=config.BUTTON_COLOR,
@@ -80,7 +85,7 @@ def local_client(screen: pygame.Surface, clock: pygame.time.Clock):
 
     UNDO_BUTTON = TextButton(
         background_image=None,
-        position=(buttons_center, 420),
+        position=(right_center, 420),
         text_input="UNDO",
         font=get_font(50),
         base_color=config.BUTTON_COLOR,
@@ -91,7 +96,7 @@ def local_client(screen: pygame.Surface, clock: pygame.time.Clock):
     LEAVE_BUTTON = TextButton(
         background_image=None,
         position=(
-            math.floor(GraphicsManager.RECT.left / 2),
+            left_center,
             math.floor(screen.get_height() / 2),
         ),
         text_input="LEAVE",
@@ -109,8 +114,6 @@ def local_client(screen: pygame.Surface, clock: pygame.time.Clock):
         ),
         text_input="",
         font=get_font(50),
-        base_color=config.BUTTON_COLOR,
-        hovering_color=config.BUTTON_HOVER_COLOR,
         on_click=open_options,
     )
 
@@ -134,11 +137,18 @@ def local_client(screen: pygame.Surface, clock: pygame.time.Clock):
         MOUSE_POSITION = pygame.mouse.get_pos()
         GraphicsManager.render_background(screen=screen)
 
-        current_state = server.get_game_state()
+        current_state = server.local_get_game_state()
 
         backgammon = Backgammon.from_state(current_state)
-
-        graphics.render_board(current_state)
+        player_colors = {
+            Player.player1: GameManager.get_setting(SettingsKeys.PIECE_COLOR),
+            Player.player2: ColorConverter.pydantic_to_pygame(
+                current_state.online_color
+            ),
+        }
+        graphics.render_board(
+            game_state=current_state, is_online=True, player_colors=player_colors
+        )
 
         if last_clicked_index == -1:
             if backgammon.get_captured_pieces() > 0:
@@ -171,7 +181,8 @@ def local_client(screen: pygame.Surface, clock: pygame.time.Clock):
         UNDO_BUTTON.toggle(disabled=not backgammon.has_history() or not is_my_turn())
 
         for button in all_buttons:
-            button.change_color(MOUSE_POSITION)
+            if not server.local_is_alone():
+                button.change_color(MOUSE_POSITION)
             button.update(screen)
 
         for event in pygame.event.get():
@@ -198,7 +209,7 @@ def local_client(screen: pygame.Surface, clock: pygame.time.Clock):
                     move = Move(
                         move_type=MoveType.bear_off, start=last_clicked_index, end=24
                     )
-                    current_state = server.local_move(move=move)
+                    save_state(server.local_move(move=move))
                     last_clicked_index = -1
 
                 index = graphics.check_track_input(mouse_position=MOUSE_POSITION)
@@ -220,7 +231,7 @@ def local_client(screen: pygame.Surface, clock: pygame.time.Clock):
                                 start=backgammon.get_start_position(),
                                 end=index,
                             )
-                            current_state = server.local_move(move=move)
+                            save_state(server.local_move(move=move))
 
                         else:
                             move = Move(
@@ -228,7 +239,7 @@ def local_client(screen: pygame.Surface, clock: pygame.time.Clock):
                                 start=last_clicked_index,
                                 end=index,
                             )
-                            current_state = server.local_move(move=move)
+                            save_state(server.local_move(move=move))
 
                         # a piece had been moved
                         last_clicked_index = -1
@@ -239,8 +250,7 @@ def local_client(screen: pygame.Surface, clock: pygame.time.Clock):
         if server.local_is_alone():
             close_options()
             render_waiting(screen=screen, leave=leave_button_click)
-
-        if options:
+        elif options:
             options_menu(screen=screen, close=close_options)
         else:
             pygame.mouse.set_cursor(cursor)
@@ -293,6 +303,11 @@ def render_waiting(screen: pygame.Surface, leave: Callable[[], None]) -> None:
 
     LEAVE_BUTTON.change_color(MOUSE_POSITION)
     LEAVE_BUTTON.update(screen)
+
+    if LEAVE_BUTTON.check_for_input(MOUSE_POSITION):
+        pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
+    else:
+        pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
 
     for event in pygame.event.get():
         if event.type == pygame.MOUSEBUTTONDOWN and LEAVE_BUTTON.check_for_input(

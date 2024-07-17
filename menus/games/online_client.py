@@ -9,19 +9,16 @@ from graphics.outline_text import OutlineText
 from menus.options import options_menu
 import math
 from models.player import Player
-from models.game_state import GameState
+from models.game_state import OnlineGameState, ColorConverter, local_to_online
 from models.move import Move, MoveType
 from server.server import Network, ServerFlags
+from game_manager import SettingsKeys, GameManager
 
 
 def online_client(screen: pygame.Surface, clock: pygame.time.Clock, ip_address: str):
     run = True
     options = False
-    player1_color = pygame.Color(100, 100, 100)
-    player2_color = pygame.Color(150, 100, 100)
-    graphics = GraphicsManager(
-        screen=screen, player1_color=player1_color, player2_color=player2_color
-    )
+    graphics = GraphicsManager(screen=screen)
 
     def open_options():
         nonlocal options
@@ -31,10 +28,14 @@ def online_client(screen: pygame.Surface, clock: pygame.time.Clock, ip_address: 
         nonlocal options
         options = False
 
-    refresh_frequency = 1000
-    time = pygame.time.get_ticks()
+    refresh_frequency = 500  # in milliseconds
 
-    current_state: GameState = Backgammon().get_state()
+    piece_color = GameManager.get_setting(SettingsKeys.PIECE_COLOR)
+    current_state: OnlineGameState = local_to_online(
+        game_state=Backgammon().get_state(),
+        online_color=ColorConverter.pygame_to_pydantic(piece_color),
+        local_color=ColorConverter.pygame_to_pydantic(piece_color),
+    )
     started = False
 
     network = Network(
@@ -44,12 +45,20 @@ def online_client(screen: pygame.Surface, clock: pygame.time.Clock, ip_address: 
         timeout=10,
     )
 
-    def save_state(state: GameState):
+    def save_state(state: OnlineGameState):
         nonlocal current_state
         current_state = state
 
         nonlocal started
-        started = True
+        if not started:
+            started = True
+
+    def send_color():
+        network.send(
+            data=ColorConverter.pygame_to_pydantic(piece_color),
+            callback=save_state,
+        )
+        print("Sent data to server")
 
     network.connect(save_state)
 
@@ -70,13 +79,17 @@ def online_client(screen: pygame.Surface, clock: pygame.time.Clock, ip_address: 
     def undo_button_click():
         network.send(data=ServerFlags.UNDO, callback=save_state)
 
+    def is_reconnecting() -> bool:
+        return not network.got_last_send and network.is_trying_to_connect()
+
     highlighted_indexes = get_movable_pieces()
 
-    buttons_center = math.floor((GraphicsManager.RECT.right + screen.get_width()) / 2)
+    right_center = math.floor((graphics.RECT.right + screen.get_width()) / 2)
+    left_center = math.floor((graphics.RECT.left) / 2)
 
     DONE_BUTTON = TextButton(
         background_image=None,
-        position=(buttons_center, 300),
+        position=(right_center, 300),
         text_input="DONE",
         font=get_font(50),
         base_color=config.BUTTON_COLOR,
@@ -86,7 +99,7 @@ def online_client(screen: pygame.Surface, clock: pygame.time.Clock, ip_address: 
 
     UNDO_BUTTON = TextButton(
         background_image=None,
-        position=(buttons_center, 420),
+        position=(right_center, 420),
         text_input="UNDO",
         font=get_font(50),
         base_color=config.BUTTON_COLOR,
@@ -97,7 +110,7 @@ def online_client(screen: pygame.Surface, clock: pygame.time.Clock, ip_address: 
     LEAVE_BUTTON = TextButton(
         background_image=None,
         position=(
-            math.floor(GraphicsManager.RECT.left / 2),
+            left_center,
             math.floor(screen.get_height() / 2),
         ),
         text_input="LEAVE",
@@ -115,8 +128,6 @@ def online_client(screen: pygame.Surface, clock: pygame.time.Clock, ip_address: 
         ),
         text_input="",
         font=get_font(50),
-        base_color=config.BUTTON_COLOR,
-        hovering_color=config.BUTTON_HOVER_COLOR,
         on_click=open_options,
     )
 
@@ -129,7 +140,9 @@ def online_client(screen: pygame.Surface, clock: pygame.time.Clock, ip_address: 
     all_buttons = game_buttons + always_on_buttons
 
     def is_my_turn() -> bool:
-        return current_state.current_turn == Player.player2
+        return current_state.current_turn == Player.player1
+
+    time = pygame.time.get_ticks()
 
     while run:
         clock.tick(config.FRAMERATE)
@@ -139,13 +152,28 @@ def online_client(screen: pygame.Surface, clock: pygame.time.Clock, ip_address: 
 
         GraphicsManager.render_background(screen=screen)
 
+        opponent_color = ColorConverter.pydantic_to_pygame(current_state.local_color)
+
+        while piece_color == opponent_color:
+            piece_color = pygame.Color(
+                255 - opponent_color.r, 255 - opponent_color.g, 255 - opponent_color.b
+            )
+        player_colors = {
+            Player.player1: piece_color,
+            Player.player2: opponent_color,
+        }
+
+        graphics.render_board(
+            game_state=current_state, is_online=True, player_colors=player_colors
+        )
+
         if (
             pygame.time.get_ticks() - time > refresh_frequency
             and started
             and network.got_last_send
         ):
             time = pygame.time.get_ticks()
-            network.send(data=ServerFlags.GET_GAME_STATE, callback=save_state)
+            send_color()
 
         backgammon = Backgammon.from_state(current_state)
 
@@ -155,9 +183,8 @@ def online_client(screen: pygame.Surface, clock: pygame.time.Clock, ip_address: 
             else:
                 highlighted_indexes = backgammon.get_movable_pieces()
 
-        graphics.render_board(current_state)
-
         graphics.highlight_tracks(highlighted_indexes)
+
         if (
             not options
             and (
@@ -177,13 +204,14 @@ def online_client(screen: pygame.Surface, clock: pygame.time.Clock, ip_address: 
         UNDO_BUTTON.toggle(disabled=not backgammon.has_history() or not is_my_turn())
 
         for button in all_buttons:
-            button.change_color(MOUSE_POSITION)
+            if not options and not is_reconnecting():
+                button.change_color(MOUSE_POSITION)
             button.update(screen)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 quit()
-            if event.type == pygame.MOUSEBUTTONDOWN and not options:
+            if event.type == pygame.MOUSEBUTTONDOWN and not options and is_my_turn():
                 for button in always_on_buttons:
                     if button.check_for_input(mouse_position=MOUSE_POSITION):
                         button.click()
@@ -237,13 +265,11 @@ def online_client(screen: pygame.Surface, clock: pygame.time.Clock, ip_address: 
 
                     print(last_clicked_index)
 
-        if not network.got_last_send and network.is_trying_to_connect():
-            close_options()
+        if is_reconnecting():
             render_connecting(screen=screen)
             if not network.connected:
                 run = False
-
-        if options:
+        elif options:
             options_menu(screen=screen, close=close_options)
         else:
             pygame.mouse.set_cursor(cursor)
@@ -266,6 +292,8 @@ def render_connecting(screen: pygame.Surface) -> None:
         ocolor=pygame.Color("black"),
         opx=3,
     )
+
+    pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
 
     CONNECTING_TEXT_RECT = CONNECTING.get_rect(center=(get_mid_width(), 300))
 

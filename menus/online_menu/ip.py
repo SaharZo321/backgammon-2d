@@ -5,7 +5,7 @@ from graphics.text_button import TextButton
 from graphics.button import Button
 from graphics.graphics_manager import get_font, get_mid_width
 from config import FRAMERATE, BUTTON_COLOR, BUTTON_HOVER_COLOR, RESOLUTION
-from game_manager import GameManager
+from game_manager import GameManager, SettingsKeys
 from graphics.graphics_manager import GraphicsManager
 from graphics.outline_text import OutlineText
 from menus.games.online_client import online_client
@@ -57,7 +57,7 @@ def ip_menu(screen: pygame.Surface, clock: pygame.time.Clock) -> None:
         True: pygame.Color("white")
     }
     
-    ip_address = "192.168.1.111"
+    ip_address = GameManager.get_setting(SettingsKeys.IP)
 
     MIN_STR = "M"
 
@@ -67,6 +67,7 @@ def ip_menu(screen: pygame.Surface, clock: pygame.time.Clock) -> None:
 
     def join_click():
         online_client(screen=screen, clock=clock, ip_address=ip_address)
+        GameManager.set_setting(SettingsKeys.IP, ip_address)
         back_click()
 
     JOIN_BUTTON = Button(

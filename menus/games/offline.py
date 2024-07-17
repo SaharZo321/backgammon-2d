@@ -1,6 +1,6 @@
 import pygame
 import pygame.gfxdraw
-from config import FRAMERATE, BUTTON_COLOR, BUTTON_HOVER_COLOR, OPTIONS_ICON
+import config
 from graphics.graphics_manager import GraphicsManager, get_font
 from backgammon.backgammon import Backgammon
 from graphics.button import Button
@@ -8,15 +8,15 @@ from graphics.text_button import TextButton
 from graphics.outline_text import OutlineText
 from menus.options import options_menu
 import math
+from game_manager import GameManager, SettingsKeys
+from models.player import Player
 
 
 def offline_game(screen: pygame.Surface, clock: pygame.time.Clock):
     run = True
     options = False
-    player1_color = pygame.Color(100, 100, 100)
-    player2_color = pygame.Color(150, 100, 100)
     graphics = GraphicsManager(
-        screen=screen, player1_color=player1_color, player2_color=player2_color
+        screen=screen
     )
     backgammon = Backgammon()
     last_clicked_index = -1
@@ -51,51 +51,52 @@ def offline_game(screen: pygame.Surface, clock: pygame.time.Clock):
 
     highlighted_indexes = backgammon.get_movable_pieces()
 
-    buttons_center = math.floor((GraphicsManager.RECT.right + screen.get_width()) / 2)
+    right_center = math.floor((graphics.RECT.right + screen.get_width()) / 2)
+    left_center = math.floor(graphics.RECT.left / 2)
 
     DONE_BUTTON = TextButton(
         background_image=None,
-        position=(buttons_center, 300),
+        position=(right_center, 300),
         text_input="DONE",
         font=get_font(50),
-        base_color=BUTTON_COLOR,
-        hovering_color=BUTTON_HOVER_COLOR,
+        base_color=config.BUTTON_COLOR,
+        hovering_color=config.BUTTON_HOVER_COLOR,
         on_click=done_button_click,
     )
 
     UNDO_BUTTON = TextButton(
         background_image=None,
-        position=(buttons_center, 420),
+        position=(right_center, 420),
         text_input="UNDO",
         font=get_font(50),
-        base_color=BUTTON_COLOR,
-        hovering_color=BUTTON_HOVER_COLOR,
+        base_color=config.BUTTON_COLOR,
+        hovering_color=config.BUTTON_HOVER_COLOR,
         on_click=undo_button_click,
     )
 
     LEAVE_BUTTON = TextButton(
         background_image=None,
         position=(
-            math.floor(GraphicsManager.RECT.left / 2),
+            left_center,
             math.floor(screen.get_height() / 2),
         ),
         text_input="LEAVE",
         font=get_font(50),
-        base_color=BUTTON_COLOR,
-        hovering_color=BUTTON_HOVER_COLOR,
+        base_color=config.BUTTON_COLOR,
+        hovering_color=config.BUTTON_HOVER_COLOR,
         on_click=leave_button_click,
     )
 
     SETTINGS_BUTTON = TextButton(
-        background_image=OPTIONS_ICON,
+        background_image=config.OPTIONS_ICON,
         position=(
             screen.get_width() - 45,
             45,
         ),
         text_input="",
         font=get_font(50),
-        base_color=BUTTON_COLOR,
-        hovering_color=BUTTON_HOVER_COLOR,
+        base_color=config.BUTTON_COLOR,
+        hovering_color=config.BUTTON_HOVER_COLOR,
         on_click=open_options,
     )
 
@@ -105,14 +106,22 @@ def offline_game(screen: pygame.Surface, clock: pygame.time.Clock):
     game_buttons = [DONE_BUTTON, UNDO_BUTTON, LEAVE_BUTTON, SETTINGS_BUTTON]
 
     while run:
-        clock.tick(FRAMERATE)
+        clock.tick(config.FRAMERATE)
         screen.fill("black")
         cursor = pygame.SYSTEM_CURSOR_ARROW
         MOUSE_POSITION = pygame.mouse.get_pos()
 
         GraphicsManager.render_background(screen=screen)
 
-        graphics.render_board(game_state=backgammon.get_state())
+        player_colors = {
+            Player.player1: GameManager.get_setting(SettingsKeys.PIECE_COLOR),
+            Player.player2: GameManager.get_setting(SettingsKeys.OPPONENT_COLOR),
+        }
+        
+        graphics.render_board(
+            game_state=backgammon.get_state(),
+            player_colors=player_colors
+        )
 
         if last_clicked_index == -1:
             if backgammon.get_captured_pieces() > 0:

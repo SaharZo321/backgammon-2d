@@ -32,6 +32,7 @@ MANIFEST
 *.manifest
 *.spec
 output/
+install/
 
 
 # Installer logs

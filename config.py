@@ -2,7 +2,8 @@ import pygame
 from asset import asset
 import os
 
-
+DEFAULT_PLAYER1_COLOR = pygame.Color(100, 100, 100)
+DEFAULT_PLAYER2_COLOR = pygame.Color(150, 100, 100)
 NETWORK_BUFFER = 2048 * 2
 GAME_PORT = 6324
 RESOLUTION: tuple[int, int] = (1280, 720)

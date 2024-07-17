@@ -1,17 +1,17 @@
 import select
 import socket
-import sys
 from threading import Thread, Event
 from typing import Callable, Any
 import pickle
 import time
 from backgammon.backgammon import OnlineBackgammon, Backgammon
-from models.player import Player
+from models.game_state import OnlineGameState
 from models.move import Move, MoveType
 from models.game_state import GameState
 from enum import Enum
 import psutil
 import ipaddress
+from pydantic_extra_types.color import Color
 
 
 def ip4_addresses() -> list[str]:
@@ -31,8 +31,7 @@ class ServerFlags(Enum):
     GET_GAME_STATE = 3
     DONE = 4
     UNDO = 5
-
-
+    
 class BGServer:
 
     _event: Event
@@ -48,18 +47,20 @@ class BGServer:
     def _get_game(self) -> Backgammon:
         return self._game.game
 
-    def get_game_state(self) -> GameState:
-        return self._game.game.get_state()
+    def local_get_game_state(self) -> OnlineGameState:
+        return self._game.get_game_state()
 
-    def __init__(self, port: int, buffer_size=2048) -> None:
+    def __init__(self, local_color: Color, online_color: Color, port: int, buffer_size=2048, timeout = 10) -> None:
         self._event = Event()
         self._buffer_size = buffer_size
-        self._game = OnlineBackgammon()
+        self._game = OnlineBackgammon(local_color=local_color, online_color=online_color)
+        self._game.local_color = local_color
         self._client_threads = []
         self.running = False
         addresses = ip4_addresses()
         print(ip4_addresses())
         self._ip = addresses
+        self._timout = timeout
         self._port = port
 
         self._server_thread = Thread(target=self._server_setup)
@@ -115,15 +116,16 @@ class BGServer:
         print("Server stopped")
 
     def _check_client_connection(self, connection: socket.socket) -> None:
-        connection.send(pickle.dumps(self.get_game_state()))
+        connection.send(pickle.dumps(self.local_get_game_state()))
         self._game.is_player2_connected = True
         self._game.started = True
         data = ""
+        connection.settimeout(self._timout)
         while not self._event.is_set():
             try:
                 raw_data = connection.recv(self._buffer_size)
 
-                if not raw_data:
+                if not raw_data:  # timout finised and got no reply
                     print("Lost connnection to: ", connection.getsockname()[0])
                     self._game.is_player2_connected = False
                     break
@@ -137,16 +139,19 @@ class BGServer:
                     self.local_done()
                 elif data == ServerFlags.LEAVE:
                     print("Player2 left the game.")
-                    connection.sendall(pickle.dumps(self.get_game_state()))
+                    connection.sendall(pickle.dumps(self._game.manipulate_board()))
                     self._game.is_player2_connected = False
                     break
-                else:
-                    move: Move = data
+                elif type(data) is Move:
+                    manipulated_move: Move = data
+                    move = self._game.manipulate_move(move=manipulated_move)
                     self.local_move(move)
+                elif type(data) is Color:
+                    self._game.online_color = data
 
                 print("Recieved: ", data)
                 print("Sending current game state")
-                connection.sendall(pickle.dumps(self.get_game_state()))
+                connection.sendall(pickle.dumps(self._game.manipulate_board()))
 
             except socket.error as error:
                 print("Disconnected from: ", connection.getsockname())
@@ -165,27 +170,27 @@ class BGServer:
     def local_is_playing(self) -> bool:
         return self._game.is_player2_connected and self._game.started
 
-    def local_move(self, move: Move) -> GameState:
+    def local_move(self, move: Move) -> OnlineGameState:
         game = self._get_game()
         game.handle_move(move=move)
-        return self.get_game_state()
+        return self.local_get_game_state()
 
-    def local_done(self) -> GameState:
+    def local_done(self) -> OnlineGameState:
         game = self._get_game()
         if not game.is_turn_done():
-            return self.get_game_state()
+            return self.local_get_game_state()
         
         if game.is_game_over():
             self._game.new_game()
         else:
             game.switch_turn()
             
-        return self.get_game_state()
+        return self.local_get_game_state()
 
-    def local_undo(self) -> GameState:
+    def local_undo(self) -> OnlineGameState:
         game = self._get_game()
         game.undo()
-        return self.get_game_state()
+        return self.local_get_game_state()
 
     def _check_client_connection_threaded(self, connection: socket.socket):
         thread = Thread(

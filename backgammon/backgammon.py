@@ -1,10 +1,9 @@
 import random
 from models.player import Player
 import copy
-from models.game_state import GameState
+from models.game_state import GameState, OnlineGameState, local_to_online
 from models.move import Move, MoveType
 from typing import Self
-import netifaces
 
 type Dice = tuple[int, int]
 
@@ -25,7 +24,7 @@ class Backgammon:
             Player.player1: 0,
             Player.player2: 0,
         }
-        
+
     def new_game(self, winner: Player | None = None):
         self.board = self.create_board()
         self.bar = {
@@ -36,17 +35,17 @@ class Backgammon:
             Player.player1: 0,
             Player.player2: 0,
         }  # Pieces in the home for each player
-        self.roll_dice()
-        while self.dice[0] == self.dice[1]:
-            self.roll_dice()
+        dice = self.roll_dice()
         if winner is None:
+            while dice[0] == dice[1]:
+                dice = self.roll_dice()
             self.current_turn = (
                 Player.player1 if self.dice[0] > self.dice[1] else Player.player2
             )
         else:
             self.current_turn = winner
         self.history = []
-    
+
     def create_board(self) -> None:
         # Initialize board with pieces in starting positions
         board = [0] * 24
@@ -63,15 +62,15 @@ class Backgammon:
     def create_board_check(self) -> None:
         # Initialize board with pieces in starting positions
         board = [0] * 24
-        board[0] = -2  
-        board[1] = -2  
-        board[2] = -2  
-        board[3] = -3  
-        board[4] = -3  
-        board[5] = -3  
-        board[23] = 1 
+        board[0] = -2
+        board[1] = -2
+        board[2] = -2
+        board[3] = -3
+        board[4] = -3
+        board[5] = -3
+        board[23] = 1
         return board
-    
+
     @classmethod
     def from_state(cls, state: GameState) -> Self:
         bg = Backgammon()
@@ -290,7 +289,6 @@ class Backgammon:
         else:
             self.score[winner] += 2
 
-
     def get_movable_pieces(self) -> list[int]:
         if self.bar[self.current_turn] > 0:
             return []
@@ -355,20 +353,76 @@ class Backgammon:
                 self.bear_off(move.start)
             case MoveType.leave_bar:
                 self.leave_bar(move.end)
-        
+
+
+from pydantic_extra_types.color import Color
+
 
 class OnlineBackgammon:
     game: Backgammon
     started: bool
     is_player2_connected: bool
-    
-    def __init__(self) -> None:
+    local_color: Color
+    online_color: Color
+
+    def __init__(self, online_color: Color, local_color: Color) -> None:
         self.game = Backgammon()
         self.started = False
         self.is_player2_connected = False
-        
-    def new_game(self):
+        self.online_color = online_color
+        self.local_color = local_color
+
+    def new_game(self) -> None:
         if self.game.is_game_over():
             winner = self.game.get_winner()
             self.game.set_winning_score(winner=winner)
         self.game.new_game(winner=winner)
+
+    def manipulate_board(self) -> OnlineGameState:
+        board = self.game.board
+        new_board = [0] * len(board)
+
+        for index, track in enumerate(board):
+            oposite_index = len(board) - index - 1
+            new_board[oposite_index] = track * -1
+
+        bar = self.game.bar
+        new_bar = {
+            Player.player1: bar[Player.player2],
+            Player.player2: bar[Player.player1],
+        }
+
+        home = self.game.home
+        new_home = {
+            Player.player1: home[Player.player2],
+            Player.player2: home[Player.player1],
+        }
+
+        current_turn = self.game.current_turn
+        new_current_turn = Player.other(current_turn)
+
+        state = self.game.get_state()
+        state.board = new_board
+        state.bar = new_bar
+        state.home = new_home
+        state.current_turn = new_current_turn
+
+        return self.get_game_state(state)
+
+    def manipulate_move(self, move: Move) -> Move:
+        board_length = len(self.game.board)
+        return Move(
+            move_type=move.move_type,
+            start=board_length - move.start - 1,
+            end=board_length - move.end - 1,
+        )
+
+    def get_game_state(self, game_state: GameState | None = None) -> OnlineGameState:
+        if game_state is None:
+            game_state = self.game.get_state()
+
+        return local_to_online(
+            game_state=game_state,
+            online_color=self.online_color,
+            local_color=self.local_color,
+        )

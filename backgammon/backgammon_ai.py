@@ -1,3 +1,5 @@
+from threading import Thread
+from typing import Callable
 from models.game_state import GameState
 from models.player import Player
 from models.move import Move, MoveType
@@ -122,16 +124,7 @@ class BackgammonAI:
         return possible_moves
 
     @classmethod
-    def copy_moves(cls, moves: list[Move]) -> list[Move]:
-        moves_copy: list[Move] = []
-        for move in moves:
-            moves_copy.append(
-                Move(start=move.start, end=move.end, move_type=move.move_type)
-            )
-        return moves_copy
-
-    @classmethod
-    def get_best_move(cls, game: Backgammon) -> ScoredMoves:
+    def local_get_best_move(cls, game: Backgammon) -> ScoredMoves:
 
         number_of_moves = len(game.moves_left)
 
@@ -148,7 +141,7 @@ class BackgammonAI:
             print("hi")
             for end in leaving_bar_pos:
                 game.leave_bar(end)
-                scored_moves = cls.get_best_move(game=game)
+                scored_moves = cls.local_get_best_move(game=game)
                 if scored_moves.score >= best_scored_moves.score:
                     best_scored_moves = scored_moves
                     best_scored_moves.moves.append(
@@ -176,7 +169,7 @@ class BackgammonAI:
                 game.bear_off(move.start)
             else:
                 game.make_move(move.start, move.end)
-            scored_moves = cls.get_best_move(game=game)
+            scored_moves = cls.local_get_best_move(game=game)
             if scored_moves.score >= best_scored_moves.score:
                 best_scored_moves = scored_moves
                 best_scored_moves.moves.append(
@@ -189,3 +182,15 @@ class BackgammonAI:
             game.undo()
 
         return best_scored_moves
+
+    @classmethod
+    def get_best_move(cls, game: Backgammon, callback: Callable[[ScoredMoves], None] = lambda x: None) -> None:
+    
+        game_copy = Backgammon.from_state(game.get_state())
+        
+        def get_best_move():
+            moves = cls.local_get_best_move(game_copy)
+            callback(moves)
+        
+        thread = Thread(target=get_best_move)
+        thread.start()
