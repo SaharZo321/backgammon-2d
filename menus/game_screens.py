@@ -94,7 +94,16 @@ class BotGame(GameScreen):
             graphics=graphics,
         )
 
-        buttons = [buttons_dict[key] for key in buttons_dict]
+        all_buttons = [buttons_dict[key] for key in buttons_dict]
+
+        game_buttons = [
+            buttons_dict[GameScreenButtonKeys.DONE],
+            buttons_dict[GameScreenButtonKeys.UNDO],
+        ]
+        always_on_buttons = [
+            buttons_dict[GameScreenButtonKeys.LEAVE],
+            buttons_dict[GameScreenButtonKeys.OPTIONS],
+        ]
 
         def on_random_click():
             nonlocal last_clicked_index
@@ -165,26 +174,35 @@ class BotGame(GameScreen):
             buttons_dict[GameScreenButtonKeys.UNDO].toggle(
                 disabled=not backgammon.has_history() or is_bot_turn()
             )
-
+            
             cursor = cls.get_cursor(
                 graphics=graphics,
-                buttons=buttons,
+                buttons=always_on_buttons,
                 backgammon=backgammon,
                 condition=not is_screen_on_top(),
             )
+            
+            cursor = cls.get_cursor(
+                graphics=graphics,
+                buttons=game_buttons,
+                backgammon=backgammon,
+                condition=not is_screen_on_top() and is_bot_turn(),
+            )
 
             cls._check_buttons(
-                screen=screen, buttons=buttons, condition=not is_screen_on_top()
+                screen=screen, buttons=all_buttons, condition=not is_screen_on_top()
             )
 
             for event in pygame.event.get():
                 cls._check_quit(event=event, quit=GameManager.quit)
                 if (
                     event.type == pygame.MOUSEBUTTONDOWN
-                    and not is_bot_turn()
                     and not is_screen_on_top()
                 ):
-                    cls._click_buttons(buttons=buttons)
+                    cls._click_buttons(buttons=always_on_buttons)
+                    
+                    if not is_bot_turn():
+                        cls._click_buttons(buttons=game_buttons)
 
                     cls._move_piece(
                         graphics=graphics,

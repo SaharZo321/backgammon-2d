@@ -4,6 +4,7 @@ from graphics.buttons import BetterButton, Button
 from graphics.graphics_manager import GraphicsManager, get_font, get_mid_width
 from graphics.outline_text import OutlineText
 from menus.game_screens import BotGame, LocalClientGame, OfflineGame, OnlineClientGame
+from menus.menus import OptionsMenu
 from menus.screen import Screen
 
 
@@ -322,6 +323,23 @@ class PlayScreen(Screen):
             pygame.display.flip()
 
 
+class OptionsScreen(Screen):
+    
+    @classmethod
+    def start(cls, screen: pygame.Surface, clock: Clock):
+        run = True
+        
+        def close():
+            nonlocal run
+            run = False
+        
+        while run:
+            GraphicsManager.render_background(screen=screen)
+            clock.tick(config.FRAMERATE)
+            OptionsMenu.start(screen=screen, on_top=False, close=close)
+            pygame.display.flip()
+
+
 class MainScreen(Screen):
 
     @classmethod
@@ -332,7 +350,7 @@ class MainScreen(Screen):
             PlayScreen.start(screen=screen, clock=clock)
 
         def options_button_click():
-            pass
+            OptionsScreen.start(screen=screen, clock=clock)
 
         def quit_button_click():
             GameManager.quit()
@@ -391,3 +409,5 @@ class MainScreen(Screen):
                     cls._click_buttons(buttons=buttons)
 
             pygame.display.flip()
+
+

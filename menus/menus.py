@@ -1,7 +1,5 @@
 import math
 from typing import Callable
-
-from pygame.time import Clock
 import config
 from game_manager import GameManager
 from graphics.buttons import BetterButton, Button
@@ -13,14 +11,14 @@ import pygame
 
 class OptionsMenu(Screen):
     @classmethod
-    def start(cls, screen: pygame.Surface, close: Callable[[], None]) -> None:
-
-        menu_surface = pygame.Surface(
-            size=config.RESOLUTION, flags=pygame.SRCALPHA, depth=32
-        )
-        menu_surface.convert_alpha()
-        menu_surface.fill(pygame.Color(0, 0, 0, 200))
-        screen.blit(source=menu_surface, dest=(0, 0))
+    def start(cls, screen: pygame.Surface, close: Callable[[], None], on_top = True) -> None:
+        if on_top:
+            menu_surface = pygame.Surface(
+                size=config.RESOLUTION, flags=pygame.SRCALPHA, depth=32
+            )
+            menu_surface.convert_alpha()
+            menu_surface.fill(pygame.Color(0, 0, 0, 200))
+            screen.blit(source=menu_surface, dest=(0, 0))
 
         def visuals_button_click():
             pass
