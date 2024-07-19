@@ -1,9 +1,10 @@
 import random
-from models.player import Player
+from threading import Thread
+from models import GameState, MoveType, OnlineGameState, ScoredMoves
+from models import Player
 import copy
-from models.game_state import GameState, OnlineGameState, local_to_online
-from models.move import Move, MoveType
-from typing import Self
+from models import Move
+from typing import Callable, Self
 
 type Dice = tuple[int, int]
 
@@ -137,6 +138,8 @@ class Backgammon:
         board_range = range(24)
         if start not in board_range or end not in board_range:
             return False
+        if (start - end) * piece_type > 0:
+            return False
         if self.board[start] * piece_type <= 0:
             return False
         if self.board[end] * piece_type < -1:
@@ -247,14 +250,14 @@ class Backgammon:
             and die * piece_type + position not in home_range
         )
 
-    def bear_off(self, position: int) -> bool:
+    def bear_off(self, start: int) -> bool:
 
-        if not any(self.can_bear_off(position, die) for die in self.moves_left):
+        if not any(self.can_bear_off(start, die) for die in self.moves_left):
             return False
 
         self.save_state()
 
-        min_die = 24 - position if Player.player1 == self.current_turn else position + 1
+        min_die = 24 - start if Player.player1 == self.current_turn else start + 1
 
         def filter_dice(die):
             return die >= min_die
@@ -263,7 +266,7 @@ class Backgammon:
         die_to_remove = min(higher_dice)
         self.moves_left.remove(die_to_remove)
 
-        self.board[position] -= 1 if self.current_turn == Player.player1 else -1
+        self.board[start] -= 1 if self.current_turn == Player.player1 else -1
         self.home[self.current_turn] += 1
         return True
 
@@ -303,17 +306,16 @@ class Backgammon:
         return placements
 
     def is_start_valid(self, start: int):
+        
         return (
-            start > -1
-            and start < 24
+            start in range(0, 24)
             and self.board[start] * self.get_piece_type(self.current_turn) > 0
         )
 
     def get_possible_tracks(self, start: int) -> list[int]:
         if not self.is_start_valid(start=start):
-            raise ValueError(
-                "chosen player is different than the game's turn or start out of bounds"
-            )
+            print(start, " is invalid: ", self.board[start] * self.get_piece_type(self.current_turn))
+            return []
 
         possible_tracks: list[int] = []
 
@@ -421,8 +423,195 @@ class OnlineBackgammon:
         if game_state is None:
             game_state = self.game.get_state()
 
-        return local_to_online(
-            game_state=game_state,
+        return game_state.to_online(
             online_color=self.online_color,
             local_color=self.local_color,
         )
+
+
+class BackgammonAI:
+    PIECE_SAFETY = 1
+    PRIME_BUILDING = 1
+    PIECE_MOBILITY = 1
+    PIECE_BEARING_OFF = 1
+    BAR = 1
+
+    @classmethod
+    def _evaluate_game_state(cls, state: GameState):
+        score = 0
+
+        # Factor 1: Piece Safety
+        score += cls.PIECE_SAFETY * cls._evaluate_piece_safety(state=state)
+
+        # Factor 2: Prime Building
+        score += cls.PRIME_BUILDING * cls._evaluate_prime_building(state=state)
+
+        # Factor 3: Mobility
+        score += cls.PIECE_MOBILITY * cls._evaluate_mobility(state=state)
+
+        # Factor 4: Bearing Off
+        score += cls.PIECE_BEARING_OFF * cls._evaluate_bearing_off(state=state)
+
+        # Factor 5: Opponent's Bar
+        score += cls.BAR * cls._evaluate_bar(state=state)
+
+        return score
+
+    @staticmethod
+    def _evaluate_piece_safety(state: GameState):
+        piece_type = Backgammon.get_piece_type(state.current_turn)
+
+        score = 0
+        for pos in range(len(state.board)):
+            if state.board[pos] * piece_type == 1:
+                score -= 5  # Penalize blots
+            elif state.board[pos] * piece_type > 1:
+                score += 2  # Reward anchors
+        return score
+
+    @staticmethod
+    def _evaluate_prime_building(state: GameState):
+        score = 0
+        current_streak = 0
+        piece_type = Backgammon.get_piece_type(state.current_turn)
+        for pos in range(24):
+            if state.board[pos] * piece_type > 1:
+                current_streak += 1
+            else:
+                if current_streak > 1:
+                    score += current_streak * 10  # Reward longer primes
+                current_streak = 0
+        if current_streak > 1:
+            score += current_streak * 10  # Reward primes at the end of the board
+        return score
+
+    @staticmethod
+    def _evaluate_mobility(state: GameState):
+        score = 0
+        piece_type = Backgammon.get_piece_type(state.current_turn)
+        for pos in range(24):
+            if state.board[pos] * piece_type > 0:
+                for die in range(1, 7):  # Consider all possible die rolls
+                    end_pos = pos + die * piece_type
+                    if 0 <= end_pos < 24:
+                        if state.board[end_pos] * piece_type >= 0:
+                            score += 1  # Reward possible legal moves
+        return score
+
+    @staticmethod
+    def _evaluate_bearing_off(state: GameState):
+        score = 0
+        piece_type = Backgammon.get_piece_type(state.current_turn)
+        home_range = range(18, 24) if piece_type == 1 else range(0, 6)
+        for pos in home_range:
+            if state.board[pos] * piece_type > 1:
+                score += 30  # Reward closer pieces to bearing off
+            if state.board[pos] * piece_type == 1:
+                score -= 10
+        score += (
+            state.home[state.current_turn] * 50
+        )  # High reward for borne off pieces
+        return score
+
+    @staticmethod
+    def _evaluate_bar(state: GameState):
+        score = 0
+        score += (
+            state.bar[Player.other(state.current_turn)] * 20
+        ) # Reward for opponent's pieces on the bar
+        score -= (
+            state.bar[state.current_turn] * 20
+        )  # Penalize for bot's pieces on the bar
+        return score
+
+    @classmethod
+    def _get_all_possible_moves(cls, game: Backgammon):
+        movable_pieces = game.get_movable_pieces()
+        possible_moves: list[Move] = []
+
+        for start in movable_pieces:
+            possible_end_pos = game.get_possible_tracks(start=start)
+
+            def to_move(end: int) -> Move:
+                move_type: MoveType = (
+                    MoveType.bear_off
+                    if end not in range(0, 24)
+                    else MoveType.normal_move
+                )
+                return Move(start=start, end=end, move_type=move_type)
+
+            possible_moves += map(to_move, possible_end_pos)
+
+        return possible_moves
+
+    @classmethod
+    def local_get_best_move(cls, game: Backgammon) -> ScoredMoves:
+
+        number_of_moves = len(game.moves_left)
+
+        if number_of_moves == 0:
+            return ScoredMoves(
+                score=cls._evaluate_game_state(game.get_state()),
+                moves=[],
+            )
+
+        if game.get_captured_pieces() > 0:  # AI has captured pieces
+            best_scored_moves = ScoredMoves(moves=[], score=-1000)
+            leaving_bar_pos = game.get_bar_leaving_positions()
+            print(leaving_bar_pos)
+            print("hi")
+            for end in leaving_bar_pos:
+                game.leave_bar(end)
+                scored_moves = cls.local_get_best_move(game=game)
+                if scored_moves.score >= best_scored_moves.score:
+                    best_scored_moves = scored_moves
+                    best_scored_moves.moves.append(
+                        Move(
+                            move_type=MoveType.leave_bar,
+                            start=game.get_start_position(),
+                            end=end,
+                        )
+                    )
+                game.undo()
+            return best_scored_moves
+
+        current_possible_moves = cls._get_all_possible_moves(game)
+        if len(current_possible_moves) == 0:
+            return ScoredMoves(
+                score=cls._evaluate_game_state(game.get_state()), moves=[]
+            )
+
+        best_scored_moves = ScoredMoves(moves=[], score=-1000)
+
+        for move in current_possible_moves:
+            move_type = MoveType.normal_move
+            if move.end not in range(0, 24):
+                move_type = MoveType.bear_off
+                game.bear_off(move.start)
+            else:
+                game.make_move(move.start, move.end)
+            scored_moves = cls.local_get_best_move(game=game)
+            if scored_moves.score >= best_scored_moves.score:
+                best_scored_moves = scored_moves
+                best_scored_moves.moves.append(
+                    Move(
+                        move_type=move_type,
+                        start=move.start,
+                        end=move.end,
+                    )
+                )
+            game.undo()
+
+        return best_scored_moves
+
+    @classmethod
+    def get_best_move(cls, game: Backgammon, callback: Callable[[ScoredMoves], None] = lambda x: None) -> None:
+
+        game_copy = Backgammon.from_state(game.get_state())
+
+        def get_best_move():
+            moves = cls.local_get_best_move(game_copy)
+            callback(moves)
+
+        thread = Thread(target=get_best_move)
+        thread.start()

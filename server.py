@@ -4,10 +4,9 @@ from threading import Thread, Event
 from typing import Callable, Any
 import pickle
 import time
-from backgammon.backgammon import OnlineBackgammon, Backgammon
-from models.game_state import OnlineGameState
-from models.move import Move, MoveType
-from models.game_state import GameState
+from backgammon import OnlineBackgammon, Backgammon
+from models import OnlineGameState
+from models import Move
 from enum import Enum
 import psutil
 import ipaddress
@@ -116,7 +115,7 @@ class BGServer:
         print("Server stopped")
 
     def _check_client_connection(self, connection: socket.socket) -> None:
-        connection.send(pickle.dumps(self.local_get_game_state()))
+        connection.send(pickle.dumps(self._game.manipulate_board()))
         self._game.is_player2_connected = True
         self._game.started = True
         data = ""

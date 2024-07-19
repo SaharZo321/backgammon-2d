@@ -42,4 +42,7 @@ class GameManager:
     def get_setting(cls, key: SettingsKeys) -> Any:
         return cls._settings[key]
     
+    @classmethod
+    def is_window_focused(cls):
+        return pygame.key.get_focused()
     
