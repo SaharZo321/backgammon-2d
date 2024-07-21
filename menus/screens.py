@@ -94,7 +94,7 @@ class JoinRoomScreen(Screen):
                         event=event,
                         current_text=ip_address,
                         on_escape=deactivate_ip_field,
-                        on_enter=join_click,
+                        on_enter=JOIN_BUTTON.click,
                     )
 
             pygame.display.flip()
