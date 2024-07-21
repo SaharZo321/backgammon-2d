@@ -3,20 +3,11 @@ import pygame
 import pygame.gfxdraw
 import math
 import config
-from graphics.buttons import TrackButton
+from config import get_font
+from graphics.elements import TrackButtonElement
 from models import Player
 from models import GameState
 from graphics.outline_text import OutlineText
-
-SCREEN_WIDTH, SCREEN_HEIGHT = config.RESOLUTION
-
-
-def get_font(size, bold=False, italic=False) -> pygame.font.Font:
-    return pygame.font.SysFont("Cooper Black", size, bold, italic)
-
-
-def get_mid_width() -> int:
-    return SCREEN_WIDTH / 2
 
 
 class GraphicsManager:
@@ -24,8 +15,8 @@ class GraphicsManager:
     surface: pygame.Surface
     top_tracks_rect: list[pygame.Rect]
     bottom_tracks_rect: list[pygame.Rect]
-    tracks: list[TrackButton]
-    home_tracks = dict[Player, TrackButton]
+    tracks: list[TrackButtonElement]
+    home_tracks: dict[Player, TrackButtonElement]
 
     RECT: pygame.Rect
 
@@ -114,11 +105,17 @@ class GraphicsManager:
 
     def create_home_tracks(self) -> None:
         self.home_tracks = {
-            Player.player2: TrackButton(
-                rect=self._HOME_TRACK_TOP_RECT, is_top=True, surface=self.surface, surface_rect=self.RECT 
+            Player.player2: TrackButtonElement(
+                rect=self._HOME_TRACK_TOP_RECT,
+                is_top=True,
+                surface=self.surface,
+                surface_rect=self.RECT,
             ),
-            Player.player1: TrackButton(
-                rect=self._HOME_TRACK_BOTTOM_RECT, is_top=False, surface=self.surface, surface_rect=self.RECT
+            Player.player1: TrackButtonElement(
+                rect=self._HOME_TRACK_BOTTOM_RECT,
+                is_top=False,
+                surface=self.surface,
+                surface_rect=self.RECT,
             ),
         }
 
@@ -143,21 +140,19 @@ class GraphicsManager:
             else:
                 button.highlighted = False
 
-    def check_track_input(self, mouse_position: tuple[int, int]) -> int:
+    def check_track_input(self) -> int:
         """
         Returns the index of clicked track.
         If no track was clicked, -1 is returned
         """
         for index, button in enumerate(self.tracks):
-            if button.check_for_input(mouse_position) and button.highlighted:
+            if button.is_input_recieved() and button.highlighted:
                 return index
         return -1
 
-    def check_home_track_input(
-        self, mouse_position: tuple[int, int], player: Player
-    ) -> bool:
+    def check_home_track_input(self, player: Player) -> bool:
         button = self.home_tracks[player]
-        return button.check_for_input(mouse_position) and button.highlighted
+        return button.is_input_recieved() and button.highlighted
 
     def create_tracks_rects(self) -> None:
 
@@ -170,7 +165,7 @@ class GraphicsManager:
             rect = pygame.Rect(NEW_RECT_POS, self._MINI_RECT.size)
             self.top_tracks_rect.append(rect)
             self.tracks.append(
-                TrackButton(
+                TrackButtonElement(
                     rect=rect, is_top=True, surface=self.surface, surface_rect=self.RECT
                 )
             )
@@ -184,7 +179,7 @@ class GraphicsManager:
             rect = pygame.Rect(NEW_RECT_POS, self._MINI_RECT.size)
             self.top_tracks_rect.append(rect)
             self.tracks.append(
-                TrackButton(
+                TrackButtonElement(
                     rect=rect, is_top=True, surface=self.surface, surface_rect=self.RECT
                 )
             )
@@ -198,7 +193,7 @@ class GraphicsManager:
             rect = pygame.Rect(NEW_RECT_POS, self._MINI_RECT.size)
             self.bottom_tracks_rect.append(rect)
             self.tracks.append(
-                TrackButton(
+                TrackButtonElement(
                     rect=rect,
                     is_top=False,
                     surface=self.surface,
@@ -215,7 +210,7 @@ class GraphicsManager:
             rect = pygame.Rect(NEW_RECT_POS, self._MINI_RECT.size)
             self.bottom_tracks_rect.append(rect)
             self.tracks.append(
-                TrackButton(
+                TrackButtonElement(
                     rect=rect,
                     is_top=False,
                     surface=self.surface,
@@ -223,7 +218,12 @@ class GraphicsManager:
                 )
             )
 
-    def render_board(self, game_state: GameState, player_colors: dict[Player, pygame.Color], is_online: bool = False):
+    def render_board(
+        self,
+        game_state: GameState,
+        player_colors: dict[Player, pygame.Color],
+        is_online: bool = False,
+    ):
 
         board = game_state.board
         bar = game_state.bar
@@ -251,8 +251,8 @@ class GraphicsManager:
         )
 
         for button in self.tracks:
-            button.update()
-        
+            button.render()
+
         self.render_tracks()
 
         self.render_pieces(board=board, player_colors=player_colors)
@@ -271,12 +271,14 @@ class GraphicsManager:
 
     def render_pieces(self, board: list[int], player_colors: pygame.Color):
         all_rect = self.top_tracks_rect + self.bottom_tracks_rect
-        
+
         for index, pieces in enumerate(board):
             player = Player.player1 if pieces > 0 else Player.player2
             color = player_colors[player]
-            self.render_track_pieces(all_rect[index], color, abs(pieces), index < 12, self._piece_radius)
-    
+            self.render_track_pieces(
+                all_rect[index], color, abs(pieces), index < 12, self._piece_radius
+            )
+
     def render_turn(self, current_turn: Player, is_online: bool):
         text = "Player1" if current_turn == Player.player1 else "Player2"
         if is_online:
@@ -305,7 +307,9 @@ class GraphicsManager:
         DICE_TEXT_RECT = DICE_TEXT.get_rect(center=buttons_center)
         self.screen.blit(DICE_TEXT, DICE_TEXT_RECT)
 
-    def render_score(self, score: dict[Player, int], player_colors: dict[Player, pygame.Color]):
+    def render_score(
+        self, score: dict[Player, int], player_colors: dict[Player, pygame.Color]
+    ):
         COLON_SCORE_TEXT = OutlineText.render(
             text=":",
             font=get_font(70),
@@ -315,7 +319,6 @@ class GraphicsManager:
         score_center = math.floor(self.RECT.left / 2), 60
         COLON_SCORE_TEXT_RECT = COLON_SCORE_TEXT.get_rect(center=score_center)
         self.screen.blit(COLON_SCORE_TEXT, COLON_SCORE_TEXT_RECT)
-        
         PLAYER1_SCORE_TEXT = OutlineText.render(
             text=str(score[Player.player1]),
             font=get_font(70),
@@ -325,7 +328,7 @@ class GraphicsManager:
         player1_midleft = math.floor(COLON_SCORE_TEXT_RECT.right + 10), 60
         PLAYER1_SCORE_TEXT_RECT = PLAYER1_SCORE_TEXT.get_rect(midleft=player1_midleft)
         self.screen.blit(PLAYER1_SCORE_TEXT, PLAYER1_SCORE_TEXT_RECT)
-        
+
         PLAYER2_SCORE_TEXT = OutlineText.render(
             text=str(score[Player.player2]),
             font=get_font(70),
@@ -335,7 +338,6 @@ class GraphicsManager:
         player2_midright = math.floor(COLON_SCORE_TEXT_RECT.left - 10), 60
         PLAYER2_SCORE_TEXT_RECT = PLAYER2_SCORE_TEXT.get_rect(midright=player2_midright)
         self.screen.blit(PLAYER2_SCORE_TEXT, PLAYER2_SCORE_TEXT_RECT)
-        
 
     def render_tracks(self) -> None:
         for index, rect in enumerate(self.top_tracks_rect):
@@ -360,7 +362,7 @@ class GraphicsManager:
         color: pygame.Color,
         number: int,
         is_top: bool,
-        radius: int
+        radius: int,
     ):
         for i in range(number):
             new_y = (
@@ -388,12 +390,15 @@ class GraphicsManager:
         color = player_colors[Player.player1]
         radius = self._piece_radius
         number = bar[Player.player1]
-        centery = math.floor((self._LEFT_SIDE_RECT.right + self._RIGHT_SIDE_RECT.left) / 2)
+        centery = math.floor(
+            (self._LEFT_SIDE_RECT.right + self._RIGHT_SIDE_RECT.left) / 2
+        )
         for counter in range(number):
             counter_center = (
-                centery, 
+                centery,
                 math.floor(
-                    (self.RECT.height / 4 - radius * number) + (counter * 2 + 1) * radius
+                    (self.RECT.height / 4 - radius * number)
+                    + (counter * 2 + 1) * radius
                 ),
             )
             self.render_piece(counter_center, color, radius)
@@ -403,7 +408,7 @@ class GraphicsManager:
         number = bar[Player.player2]
         for counter in range(number):
             counter_center = (
-                centery, 
+                centery,
                 math.floor(
                     (self.RECT.height / 4 * 3 - radius * number)
                     + (counter * 2 + 1) * radius
@@ -439,7 +444,7 @@ class GraphicsManager:
         piece_width = self._HOME_TRACK_TOP_RECT.width
         # render top pieces
         player = Player.player2
-        self.home_tracks[player].update()
+        self.home_tracks[player].render()
         for piece in range(home[player]):
             color = player_colors[player]
             top = self._HOME_TRACK_TOP_RECT.top + piece * piece_height
@@ -454,7 +459,7 @@ class GraphicsManager:
 
         # render bottom pieces
         player = Player.player1
-        self.home_tracks[player].update()
+        self.home_tracks[player].render()
         for piece in range(home[player]):
             color = player_colors[player]
             top = self._HOME_TRACK_BOTTOM_RECT.bottom - (piece + 1) * piece_height

@@ -1,17 +1,34 @@
 import math
 from typing import Callable
+
+from pygame.time import Clock
 import config
-from game_manager import GameManager
-from graphics.buttons import BetterButton, Button
-from graphics.graphics_manager import get_font, get_mid_width
+from config import get_font
+from game_manager import GameManager, SettingsKeys
+from graphics.elements import BetterButtonElement, Element
+from config import get_mid_width
 from graphics.outline_text import OutlineText
+from graphics.elements import ButtonElement, SliderElement
 from menus.screen import Screen
 import pygame
 
 
-class OptionsMenu(Screen):
+class Menu(Screen):
     @classmethod
-    def start(cls, screen: pygame.Surface, close: Callable[[], None], on_top = True) -> None:
+    def start(cls, screen: pygame.Surface, close: Callable[[], None], events: list[pygame.event.Event]):
+        pass
+        raise NotImplementedError()
+
+
+class OptionsMenu(Menu):
+    @classmethod
+    def start(
+        cls,
+        screen: pygame.Surface,
+        close: Callable[[], None],
+        events: list[pygame.event.Event],
+        on_top=True,
+    ) -> None:
         if on_top:
             menu_surface = pygame.Surface(
                 size=config.RESOLUTION, flags=pygame.SRCALPHA, depth=32
@@ -22,8 +39,50 @@ class OptionsMenu(Screen):
 
         def visuals_button_click():
             pass
+        
+        current_color: pygame.Color = GameManager.get_setting(key=SettingsKeys.piece_color)
+        
+        def set_color(value: int, id: str):
+            color = {
+                "red": current_color.r,
+                "green": current_color.g,
+                "blue": current_color.b,
+            }
+            color[id] = value
+            new_color = pygame.Color(color["red"], color["green"], color["blue"])
+            GameManager.set_setting(key=SettingsKeys.piece_color, value=new_color)
+        
+        red_slider = SliderElement(
+            min_value=0,
+            max_value=255,
+            label="RED",
+            rect=pygame.Rect(150, 50, 150, 30),
+            default_value=current_color.r,
+            on_value_changed=set_color,
+            id="red"
+        )
+        
+        green_slider = SliderElement(
+            min_value=0,
+            max_value=255,
+            label="GREEN",
+            rect=pygame.Rect(150, 100, 150, 30),
+            default_value=current_color.g,
+            on_value_changed=set_color,
+            id="green"
+        )
+        
+        blue_slider = SliderElement(
+            min_value=0,
+            max_value=255,
+            label="BLUE",
+            rect=pygame.Rect(150, 150, 150, 30),
+            default_value=current_color.b,
+            on_value_changed=set_color,
+            id="blue"
+        )
 
-        VISUALS_BUTTON = Button(
+        VISUALS_BUTTON = ButtonElement(
             background_image=None,
             position=(get_mid_width(), 270),
             text_input="EXAMPLE",
@@ -34,7 +93,7 @@ class OptionsMenu(Screen):
             on_click=visuals_button_click,
         )
 
-        BACK_BUTTON = Button(
+        BACK_BUTTON = ButtonElement(
             background_image=None,
             position=(get_mid_width(), 650),
             text_input="BACK",
@@ -46,18 +105,18 @@ class OptionsMenu(Screen):
             on_click=close,
         )
 
-        buttons: list[Button] = [VISUALS_BUTTON, BACK_BUTTON]
+        elements: list[Element] = [VISUALS_BUTTON, BACK_BUTTON] + [green_slider, red_slider, blue_slider]
 
-        pygame.mouse.set_cursor(cls._check_buttons(screen=screen, buttons=buttons))
+        pygame.mouse.set_cursor(cls._get_cursor(elements=elements))
+        cls._render_elements(screen=screen, elements=elements)
 
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                GameManager.quit()
+        for event in events:
+            cls._check_quit(event, GameManager.quit)
             if event.type == pygame.MOUSEBUTTONDOWN:
-                cls._click_buttons(buttons=buttons)
+                cls._click_elements(elements=elements)
 
 
-class ReconnectingMenu(Screen):
+class ReconnectingMenu(Menu):
 
     @classmethod
     def start(cls, screen: pygame.Surface) -> None:
@@ -83,7 +142,7 @@ class ReconnectingMenu(Screen):
         screen.blit(CONNECTING, CONNECTING_TEXT_RECT)
 
 
-class UnfocusedMenu(Screen):
+class UnfocusedMenu(Menu):
 
     @classmethod
     def start(cls, screen: pygame.Surface) -> None:
@@ -111,10 +170,10 @@ class UnfocusedMenu(Screen):
         screen.blit(UNFOCUSED, UNFOCUSED_TEXT_RECT)
 
 
-class WaitingMenu(Screen):
-    
+class WaitingMenu(Menu):
+
     @classmethod
-    def start(cls, screen: pygame.Surface, leave: Callable[[], None]):
+    def start(cls, screen: pygame.Surface, close: Callable[[], None], events: list[pygame.event.Event]):
         menu_surface = pygame.Surface(
             size=config.RESOLUTION, flags=pygame.SRCALPHA, depth=32
         )
@@ -146,18 +205,18 @@ class WaitingMenu(Screen):
 
         screen.blit(WATING_TEXT, WATING_TEXT_RECT)
 
-        LEAVE_BUTTON = BetterButton(
+        leave_button = BetterButtonElement(
             position=(get_mid_width(), 650),
             text_input="LEAVE",
             font=get_font(50),
             base_color=config.BUTTON_COLOR,
             hovering_color=config.BUTTON_HOVER_COLOR,
-            on_click=leave,
+            on_click=close,
         )
 
-        cursor = cls._check_buttons(screen=screen, buttons=[LEAVE_BUTTON])
-        pygame.mouse.set_cursor(cursor)
-        
-        for event in pygame.event.get():
+        cls._render_elements(screen=screen, elements=[leave_button])
+        pygame.mouse.set_cursor(cls._get_cursor(elements=[leave_button]))
+
+        for event in events:
             if event.type == pygame.MOUSEBUTTONDOWN:
-                cls._click_buttons([LEAVE_BUTTON])
+                cls._click_elements([leave_button])
