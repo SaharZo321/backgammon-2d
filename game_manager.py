@@ -1,26 +1,28 @@
 import pygame
 import sys
 import config
-from enum import Enum
+from enum import IntEnum, auto
 from typing import Any
 
-class SettingsKeys(Enum):
-    IP = 0
-    PIECE_COLOR = 1
-    OPPONENT_COLOR = 2
+class SettingsKeys(IntEnum):
+    ip = auto()
+    piece_color = auto()
+    opponent_color = auto()
 
 
 class GameManager:
     clock: pygame.time.Clock
     screen: pygame.Surface
-    _settings: dict[SettingsKeys]
+    _options: dict[SettingsKeys]
+    _options_menu: bool
 
     @classmethod
     def start(cls):
-        cls._settings = {
-            SettingsKeys.IP: "",
-            SettingsKeys.OPPONENT_COLOR: pygame.Color(150, 100, 100),
-            SettingsKeys.PIECE_COLOR: pygame.Color(100, 100, 100),
+        _options_menu = False
+        cls._options = {
+            SettingsKeys.ip: "",
+            SettingsKeys.opponent_color: pygame.Color(150, 100, 100),
+            SettingsKeys.piece_color: pygame.Color(100, 100, 100),
         }
         pygame.init()
         pygame.font.init()
@@ -36,11 +38,11 @@ class GameManager:
 
     @classmethod
     def set_setting(cls, key: SettingsKeys, value: Any):
-        cls._settings[key] = value
+        cls._options[key] = value
         
     @classmethod
     def get_setting(cls, key: SettingsKeys) -> Any:
-        return cls._settings[key]
+        return cls._options[key]
     
     @classmethod
     def is_window_focused(cls):

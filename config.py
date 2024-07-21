@@ -19,3 +19,11 @@ OPTIONS_ICON = pygame.transform.scale(
 ICON = pygame.transform.scale(
     pygame.image.load(asset(os.path.join("assets", "backgammon.png"))), (60, 60)
 )
+
+
+def get_font(size: int, bold=False, italic=False) -> pygame.font.Font:
+    return pygame.font.SysFont("Cooper Black", size, bold, italic)
+
+
+def get_mid_width() -> int:
+    return RESOLUTION[0] / 2
