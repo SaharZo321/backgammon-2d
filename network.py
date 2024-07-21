@@ -69,7 +69,9 @@ class BGServer:
 
         while not self._stop_event.is_set():
             try:
-                raw_data = await asyncio.wait_for(reader.read(self._buffer_size), timeout=self._timeout)
+                raw_data = await asyncio.wait_for(
+                    reader.read(self._buffer_size), timeout=self._timeout
+                )
                 if not raw_data:
                     print(f"Received no data from {address}")
                     break
@@ -99,7 +101,7 @@ class BGServer:
                 await self.send_data(writer=writer, data=response)
                 print(f"Data sent back to: {address}: {response}")
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 print(f"Lost connection to {address}: waiting for connection")
                 self.connected = False
                 break
@@ -115,47 +117,49 @@ class BGServer:
     async def send_data(self, writer: asyncio.StreamWriter, data):
         writer.write(pickle.dumps(data))
         await writer.drain()
-    
-    async def _start_server(self):
-        self.server = await asyncio.start_server(
-            host=self._ip,
-            port=self._port,
-            client_connected_cb=self.handle_client,
-            limit=self._buffer_size,
-        )
-        addresses = ", ".join(str(sock.getsockname()) for sock in self.server.sockets)
-        print(f"Serving on {addresses}")
-
-        async with self.server:
-            try:
-                await self.server.serve_forever()
-            except asyncio.CancelledError:
-                print("Server stopped.")
-
-    async def _stop_server(self):
-        if self.server:
-            self.server.close()
-            await self.server.wait_closed()
-
-    def _start(self):
-        self.loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self.loop)
-        self.loop.run_until_complete(self._start_server())
 
     def run_server(self):
         if self._stop_event.is_set():
             self._stop_event = asyncio.Event()
             print("Starting again.")
 
+        async def start_server():
+            self.server = await asyncio.start_server(
+                host=self._ip,
+                port=self._port,
+                client_connected_cb=self.handle_client,
+                limit=self._buffer_size,
+            )
+            addresses = ", ".join(
+                str(sock.getsockname()) for sock in self.server.sockets
+            )
+            print(f"Serving on {addresses}")
+
+            async with self.server:
+                try:
+                    await self.server.serve_forever()
+                except asyncio.CancelledError:
+                    print("Server stopped.")
+
+        def start():
+            self.loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self.loop)
+            self.loop.run_until_complete(start_server())
+
         if self.server_thread is None:
-            self.server_thread = Thread(target=self._start)
+            self.server_thread = Thread(target=start)
             self.server_thread.start()
 
-    def close_server(self):
+    def stop_server(self):
         print("Server shutting down")
         self._stop_event.set()
+        async def close_server():
+            if self.server:
+                self.server.close()
+                await self.server.wait_closed()
+
         if self.loop and self.loop.is_running():
-            asyncio.run_coroutine_threadsafe(self._stop_server(), self.loop).result()
+            asyncio.run_coroutine_threadsafe(close_server(), self.loop)
 
         if self.server_thread is not None:
             self.server_thread.join()
@@ -205,9 +209,11 @@ class NetworkClient:
         self._timed_out_event = asyncio.Event()
         self._started_event = asyncio.Event()
         self._stop_event = asyncio.Event()
-        self.request_queue: queue.Queue[tuple[Any, Callable[[Any],None]]] = queue.Queue()
+        self.request_queue: queue.Queue[tuple[Any, Callable[[Any], None]]] = (
+            queue.Queue()
+        )
         self.time_on_receive = 0
-        
+
         def connect_threaded():
             asyncio.run(self.handle_connection())
             print("Client disconnected")
@@ -222,49 +228,55 @@ class NetworkClient:
             )
             self._started_event.set()
             print(f"Connected to {self.host}")
+        except ConnectionRefusedError:
+            print(f"{self.host} refused to connect")
+            self._stop_event.set()
+            return
         except:
             print(f"Could not establish connection to {self.host}")
             self._stop_event.set()
             return
-            
         # loop to send messages
-        
+
         while not self._stop_event.is_set():
             try:
                 data, on_recieve = self.request_queue.get(timeout=1)
                 await self.handle_send_data(data=data, writer=writer)
-                print(f"Data sent: {data}")
                 self.request_queue.task_done()
                 await self.handle_recieved_data(on_recieve=on_recieve, reader=reader)
-                print("Data recieved.")
             except queue.Empty:
                 print("Empty queue...")
                 continue
-            
+
         writer.close()
-        await writer.wait_closed()    
+        await writer.wait_closed()
         print("closed writer")
 
     async def handle_send_data(self, data, writer: asyncio.StreamWriter):
         writer.write(pickle.dumps(data))
         await writer.drain()
+        print(f"Data sent: {data}")
+        
 
-    async def handle_recieved_data(self, on_recieve: Callable[[Any], None], reader: asyncio.StreamReader):
+    async def handle_recieved_data(
+        self, on_recieve: Callable[[Any], None], reader: asyncio.StreamReader
+    ):
         try:
             raw_data = await asyncio.wait_for(
                 reader.read(self._buffer_size), timeout=self._timeout
             )
             if not raw_data:
                 self.disconnect(threaded=True)
-                print("Received no data, Closing client")
+                print("Received no data, closing client")
                 return
+            print("Data recieved.")
             data = pickle.loads(raw_data)
             on_recieve(data)
             self.time_on_receive = time.time()
-        except (asyncio.TimeoutError, asyncio.CancelledError):
+        except TimeoutError:
             self.disconnect(threaded=True)
             print("Timed out... Closing client")
-
+            
     def send(self, data, on_recieve: Callable[[Any], None] = lambda x: None):
         if not self._started_event.is_set() or self._stop_event.is_set():
             print("Not connected, cannot send")
@@ -281,7 +293,7 @@ class NetworkClient:
         self._stop_event = asyncio.Event()
         self.client_thread.start()
 
-    def disconnect(self, data = None, threaded = False):
+    def disconnect(self, data=None, threaded=False):
         if data is not None:
             self.send(data=data)
             self.request_queue.join()
@@ -292,9 +304,9 @@ class NetworkClient:
 
     def is_connected(self):
         return not self._stop_event.is_set()
-    
-    def time_from_last_recieve(self):
-        return time.time() - self.time_on_receive
 
     def has_started(self):
         return self._started_event.is_set()
+
+    def time_from_last_recieve(self):
+        return time.time() - self.time_on_receive

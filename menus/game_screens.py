@@ -397,14 +397,14 @@ class LocalClientGame(GameScreen):
         last_clicked_index = -1
 
         def quit():
-            server.close_server()
+            server.stop_server()
             GameManager.quit()
 
         def get_movable_pieces():
             return Backgammon([current_state]).get_movable_pieces()
 
         def leave_button_click():
-            server.close_server()
+            server.stop_server()
             nonlocal run
             run = False
 

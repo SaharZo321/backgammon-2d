@@ -33,6 +33,9 @@ class JoinRoomScreen(Screen):
             run = False
 
         def join_click():
+            if not cls._is_valid_ip(ip_address):
+                return
+            
             OnlineClientGame.start(screen=screen, clock=clock, ip_address=ip_address)
             GameManager.set_setting(SettingsKeys.ip, ip_address)
             back_click()
@@ -91,7 +94,7 @@ class JoinRoomScreen(Screen):
                         event=event,
                         current_text=ip_address,
                         on_escape=deactivate_ip_field,
-                        on_enter=JOIN_BUTTON.click,
+                        on_enter=join_click,
                     )
 
             pygame.display.flip()
