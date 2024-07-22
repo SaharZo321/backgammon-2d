@@ -199,6 +199,7 @@ class UnfocusedMenu(Menu):
         screen.blit(source=menu_surface, dest=(0, 0))
 
         OutlineText.render(
+            surface=screen
             text="UNFOCUSED...",
             font=get_font(100),
             text_color=pygame.Color("white"),
