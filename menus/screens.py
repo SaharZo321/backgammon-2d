@@ -1,7 +1,7 @@
 import config
 from config import get_font
 from game_manager import GameManager, SettingsKeys
-from graphics.elements import BetterButtonElement
+from graphics.elements import BetterButtonElement, Element, TextFieldElement
 from graphics.elements import ButtonElement
 from graphics.graphics_manager import GraphicsManager
 from graphics.outline_text import OutlineText
@@ -77,12 +77,6 @@ class JoinRoomScreen(Screen):
     def start(cls, screen: pygame.Surface, clock: Clock):
         run = True
 
-        ip_field_active = False
-
-        def deactivate_ip_field(active: bool = False):
-            nonlocal ip_field_active
-            ip_field_active = active
-
         ip_address = GameManager.get_setting(SettingsKeys.ip)
 
         def back_click():
@@ -92,7 +86,6 @@ class JoinRoomScreen(Screen):
         def join_click():
             if not cls._is_valid_ip(ip_address):
                 return
-            
             OnlineClientGame.start(screen=screen, clock=clock, ip_address=ip_address)
             GameManager.set_setting(SettingsKeys.ip, ip_address)
             back_click()
@@ -119,108 +112,60 @@ class JoinRoomScreen(Screen):
             outline_size=1,
             on_click=back_click,
         )
+        
+        def set_ip(ip: str):
+            nonlocal ip_address
+            ip_address = ip
+        
+        ip_field = TextFieldElement(
+            font=get_font(60),
+            anchor={"center": (config.SCREEN.centerx, 300)},
+            width=500,
+            default=ip_address,
+            on_value_changed=set_ip,
+            text_align="center",
+            on_enter=join_click
+        )
 
-        buttons: list[ButtonElement] = [BACK_BUTTON, JOIN_BUTTON]
+        menu_text = OutlineText(
+            text="Enter IP Address",
+            font=get_font(80),
+            text_color=pygame.Color("white"),
+            outline_color=pygame.Color("black"),
+            position=(config.SCREEN.centerx, 100),
+        )
+        
+        elements: list[Element] = [BACK_BUTTON, JOIN_BUTTON, ip_field]
 
         while run:
 
             clock.tick(config.FRAMERATE)
 
-            mouse_position = pygame.mouse.get_pos()
-
             JOIN_BUTTON.toggle(disabled=not cls._is_valid_ip(ip_address))
-
-            cls._render_menu(screen=screen, buttons=buttons)
-
-            FIELD_BACKGROUND_RECT = cls._render_text_field(
-                text=ip_address, screen=screen, active=ip_field_active
-            )
             
-            for event in pygame.event.get():
+            GraphicsManager.render_background(screen)
+            
+            menu_text.update(screen)
+            
+            events = pygame.event.get()
+            
+            cls._render_elements(screen=screen, elements=elements, events=events)
+            pygame.mouse.set_cursor(cls._get_cursor(elements=elements))
+            
+            for event in events:
                 cls._check_quit(event=event, quit=GameManager.quit)
                 if event.type == pygame.MOUSEBUTTONDOWN:
-                    cls._click_elements(elements=buttons)
+                    cls._click_elements(elements=elements)
 
-                    if FIELD_BACKGROUND_RECT.collidepoint(mouse_position):
-                        deactivate_ip_field(True)
-                    else:
-                        deactivate_ip_field(False)
-
-                if event.type == pygame.KEYDOWN and ip_field_active:
-                    ip_address = cls._next_text(
-                        event=event,
-                        current_text=ip_address,
-                        on_escape=deactivate_ip_field,
-                        on_enter=JOIN_BUTTON.click,
-                    )
 
             pygame.display.flip()
-
-    @classmethod
-    def _render_text_field(cls, text: str, screen: pygame.Surface, active=True):
-        TEXT = OutlineText.get_surface(
-            text=text,
-            font=get_font(80),
-            text_color=pygame.Color("white"),
-            outline_color=pygame.Color("black"),
-        )
-        TEXT_RECT = TEXT.get_rect(center=(config.SCREEN.centerx, 320))
-
-        MIN_STR = "M"
-
-        MIN_FIELD_BACKGROUND_RECT = (
-            get_font(80)
-            .render(
-                MIN_STR,
-                True,
-                pygame.Color("white"),
-            )
-            .get_rect(center=(config.SCREEN.centerx, 320))
-        )
-
-        FIELD_BACKGROUND_RECT = (
-            MIN_FIELD_BACKGROUND_RECT if len(text) <= len(MIN_STR) else TEXT_RECT
-        )
-        colors = {False: pygame.Color("gray"), True: pygame.Color("white")}
-
-        pygame.draw.rect(
-            surface=screen,
-            color=colors[active],
-            rect=FIELD_BACKGROUND_RECT.scale_by(1.1, 1.1),
-            border_radius=20,
-        )
-        screen.blit(TEXT, TEXT_RECT)
-
-        return FIELD_BACKGROUND_RECT
-
+            
     @classmethod
     def _is_valid_ip(cls, address: str):
         try:
             return ipaddress.IPv4Address(address).is_private
         except:
             return False
-
-    @classmethod
-    def _render_menu(
-        cls,
-        screen: pygame.Surface,
-        buttons: list[ButtonElement],
-    ):
-        screen.fill("black")
-
-        GraphicsManager.render_background(screen)
-
-        MENU_TEXT = OutlineText.get_surface(
-            text="Enter IP Address",
-            font=get_font(70),
-            text_color=pygame.Color("white"),
-            outline_color=pygame.Color("black"),
-        )
-        MENU_RECT = MENU_TEXT.get_rect(center=(config.SCREEN.centerx, 80))
-        screen.blit(MENU_TEXT, MENU_RECT)
-
-        cls._render_elements(screen=screen, elements=buttons)
-        pygame.mouse.set_cursor(cls._get_cursor(elements=buttons))
 
 
 class OnlineScreen(Screen):

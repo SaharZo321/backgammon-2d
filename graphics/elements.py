@@ -1,6 +1,7 @@
 import math
 from typing import Callable, Literal
 import pygame
+from pygame.event import Event
 from config import get_font
 import config
 from game_manager import GameManager, SettingsKeys
@@ -32,7 +33,6 @@ class Element:
     def is_input_recieved(self) -> bool:
         mouse_position = pygame.mouse.get_pos()
         return not self.disabled and self.rect.collidepoint(mouse_position)
-
 
 
 class ButtonElement(Element):
@@ -245,7 +245,9 @@ class BetterButtonElement(ButtonElement):
         disabled_color = self.base_color // pygame.Color(2, 2, 2, 1)
         disabled_outline_color = self.outline_color // pygame.Color(2, 2, 2, 1)
         disabled_text_color = self.text_color // pygame.Color(2, 2, 2, 1)
-        disabled_text_outline_color = self.text_outline_color // pygame.Color(2, 2, 2, 1)
+        disabled_text_outline_color = self.text_outline_color // pygame.Color(
+            2, 2, 2, 1
+        )
 
         color = self.hovering_color if is_hovering else self.base_color
         self._displayed_color = color if not self.disabled else disabled_color
@@ -274,7 +276,7 @@ class BetterButtonElement(ButtonElement):
 
     def update(self, events: list[pygame.event.Event]) -> None:
         self._toggle_color(self.is_input_recieved())
-        
+
     def get_surface(self):
         return self.surface
 
@@ -396,11 +398,13 @@ class SliderElement(Element):
                 outline_color=pygame.Color("black"),
             )
         elif isinstance(label, ButtonElement):
-            self.label = pygame.Surface(label.get_surface().get_size(), flags=pygame.SRCALPHA, depth=32)
+            self.label = pygame.Surface(
+                label.get_surface().get_size(), flags=pygame.SRCALPHA, depth=32
+            )
             self.label.convert_alpha()
         elif type(label) is pygame.Surface:
             self.label = label
-        
+
         label_size = self.label.get_size()
         match label_position:
             case "left" | "right":
@@ -413,7 +417,7 @@ class SliderElement(Element):
                 self.rect = pygame.Surface((width, height)).get_rect(**anchor)
         self.label_position = label_position
         self.set_elements_position(label_position)
-        
+
         if isinstance(label, ButtonElement):
             label.rect = self._label_rect
 
@@ -433,7 +437,7 @@ class SliderElement(Element):
     def is_input_recieved(self) -> bool:
         mouse_position = pygame.mouse.get_pos()
         return not self.disabled and self._slider_rect.collidepoint(mouse_position)
-    
+
     def click(self):
         print("clicked")
         SoundManager.play_sound(
@@ -489,4 +493,101 @@ class SliderElement(Element):
                 self._slider_rect = self.slider_surface.get_rect(
                     midtop=self.rect.midtop
                 )
+
+
+class TextFieldElement(Element):
+    def __init__(
+        self,
+        font: pygame.font.Font,
+        anchor: dict[AnchorPosition, tuple[int, int]],
+        width: int = 0,
+        default: str = "",
+        disabled: bool = True,
+        text_align: Literal["right", "left", "center"] = "left",
+        on_enter: Callable[[], None] = lambda: None,
+        on_value_changed: Callable[[str], None] = lambda x: None,
+    ) -> None:
+        self.font = font
+        self.width = width
+        self.disabled = disabled
+        self.surface: pygame.Surface = pygame.transform.scale(
+            pygame.Surface((1, 1), flags=pygame.SRCALPHA, depth=32),
+            (width + 30, font.get_height() + 20),
+        )
+        self.surface.convert_alpha()
+        self.surface_rect = self.surface.get_rect(topleft=(0, 0))
+        self.rect = self.surface.get_rect(**anchor)
+        self.max_text_rect = pygame.Surface((width, font.get_height())).get_rect(
+            center=self.surface_rect.center
+        )
+        self.value = default
+        self.text_align = text_align
+        self.on_enter = on_enter
+        self.on_value_changed = on_value_changed
+
+    def is_input_recieved(self) -> bool:
+        mouse_pos = pygame.mouse.get_pos()
+        return self.rect.collidepoint(mouse_pos)
+
+    def update(self, events: list[Event]) -> None:
+        for event in events:
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                self.disabled = not self.is_input_recieved()
+
+            if event.type != pygame.KEYDOWN or self.disabled:
+                continue
+            
+            match event.key:
+                case pygame.K_BACKSPACE:
+                    # get text input from 0 to -1 i.e. end.
+                    self.value = self.value[:-1]
+                case pygame.K_RETURN | pygame.K_KP_ENTER:
+                    self.on_enter() 
+                case pygame.K_ESCAPE:
+                    self.disabled = True
+                case _:
+                    # Unicode standard is used for string formation
+                    self.value += event.unicode
         
+        self.on_value_changed(self.value)
+
+    def click(self):
+        if self.is_input_recieved():
+            self.disabled = False
+        else:
+            self.disabled = True
+
+    def render(self, surface: pygame.Surface) -> None:
+        text_to_render = self.value
+        long = False
+        while self.font.size("..." + text_to_render)[0] > self.max_text_rect.width:
+            text_to_render = text_to_render[1:]
+            long = True
+        if long:
+            text_to_render = "..." + text_to_render
+
+        TEXT = self.font.render(text_to_render, True, "black")
+        TEXT_RECT = TEXT.get_rect(midleft=self.max_text_rect.midleft)
+        match self.text_align:
+            case "right":
+                TEXT_RECT = TEXT.get_rect(midright=self.max_text_rect.midright)
+            case "center":
+                TEXT_RECT = TEXT.get_rect(center=self.max_text_rect.center)
+
+        pygame.draw.rect(
+            self.surface,
+            ("gray" if self.disabled else "white"),
+            self.surface_rect,
+            0,
+            math.floor(self.surface_rect.height / 5),
+        )
+        pygame.draw.rect(
+            self.surface,
+            "black",
+            self.surface_rect,
+            math.floor(self.surface_rect.height / 12),
+            math.floor(self.surface_rect.height / 8),
+        )
+        self.surface.blit(TEXT, TEXT_RECT)
+
+        surface.blit(self.surface, self.rect)
