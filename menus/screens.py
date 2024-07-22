@@ -13,6 +13,63 @@ from pygame.time import Clock
 import ipaddress
 import math
 
+class LostConnection(Screen):
+
+    @classmethod
+    def start(cls, screen: pygame.Surface, clock: Clock):
+        run = True
+
+        lost_connection = OutlineText(
+            text="LOST CONNECTION",
+            font=get_font(100),
+            text_color=pygame.Color("white"),
+            outline_color=pygame.Color("black"),
+            position=(config.SCREEN.centerx, 200),
+        )
+        
+        to_the_server = OutlineText(
+            text="TO THE SERVER",
+            font=get_font(100),
+            text_color=pygame.Color("white"),
+            outline_color=pygame.Color("black"),
+            position=(config.SCREEN.centerx, 300),
+        )
+        
+
+        def back_click():
+            nonlocal run
+            run = False
+
+        BACK_BUTTON = ButtonElement(
+            position=(config.SCREEN.centerx, 650),
+            text_input="BACK",
+            font=get_font(50),
+            base_color=config.BUTTON_COLOR,
+            hovering_color=config.BUTTON_HOVER_COLOR,
+            outline_color=pygame.Color("black"),
+            outline_size=1,
+            on_click=back_click,
+        )
+
+        buttons: list[ButtonElement] = [BACK_BUTTON]
+
+        while run:
+            GraphicsManager.render_background(screen)
+            clock.tick(config.FRAMERATE)
+
+            lost_connection.update(screen)
+            to_the_server.update(screen)
+            
+            cls._render_elements(screen=screen, elements=buttons)
+            pygame.mouse.set_cursor(cls._get_cursor(elements=buttons))
+            
+            for event in pygame.event.get():
+                cls._check_quit(event=event, quit=GameManager.quit)
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    cls._click_elements(elements=buttons)
+
+            pygame.display.flip()
+
 
 class JoinRoomScreen(Screen):
 

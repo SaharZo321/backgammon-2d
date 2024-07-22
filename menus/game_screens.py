@@ -8,7 +8,7 @@ from config import get_font
 from game_manager import GameManager, SettingsKeys
 from graphics.elements import ButtonElement
 from graphics.graphics_manager import ColorConverter, GraphicsManager
-from menus.menus import ConnectingMenu, UnfocusedMenu, WaitingMenu
+from menus.menus import ConnectingMenu, LostConnectionMenu, UnfocusedMenu, WaitingMenu
 from menus.screen import GameScreen, GameScreenButtonKeys
 from menus.menus import OptionsMenu
 from models import GameState, Move, MoveType, OnlineGameState, ScoredMoves, ServerFlags
@@ -457,7 +457,7 @@ class LocalClientGame(GameScreen):
             nonlocal options
             options = False
 
-        highlighted_indexes = get_movable_pieces()
+        highlighted_indexes = []
 
         buttons_dict = cls._get_buttons(
             on_leave=leave_button_click,
@@ -844,7 +844,9 @@ class OnlineClientGame(GameScreen):
                         on_bear_off=on_bear_off,
                     )
 
-            if not network_client.has_started or is_reconnecting():
+            if not network_client.is_connected() and network_client.has_started():
+                LostConnectionMenu.start(screen=screen, close=leave_button_click, events=events)
+            elif not network_client.has_started() or is_reconnecting():
                 ConnectingMenu.start(screen=screen)
                 if not network_client.is_connected():
                     run = False

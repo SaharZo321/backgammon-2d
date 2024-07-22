@@ -173,7 +173,7 @@ class ConnectingMenu(Menu):
         menu_surface.convert_alpha()
         menu_surface.fill(pygame.Color(0, 0, 0, 180))
         screen.blit(source=menu_surface, dest=(0, 0))
-
+        
         OutlineText.render(
             text="CONNECTING...",
             font=get_font(100),
@@ -199,7 +199,7 @@ class UnfocusedMenu(Menu):
         screen.blit(source=menu_surface, dest=(0, 0))
 
         OutlineText.render(
-            surface=screen
+            surface=screen,
             text="UNFOCUSED...",
             font=get_font(100),
             text_color=pygame.Color("white"),
@@ -239,6 +239,59 @@ class WaitingMenu(Menu):
 
         OutlineText.render(
             text="WATING",
+            font=get_font(80),
+            text_color=pygame.Color("white"),
+            outline_color=pygame.Color("black"),
+            outline_width=3,
+            position=(config.SCREEN.centerx, 400),
+            surface=screen,
+        )
+
+        leave_button = BetterButtonElement(
+            position=(config.SCREEN.centerx, 650),
+            text_input="LEAVE",
+            font=get_font(50),
+            base_color=config.BUTTON_COLOR,
+            hovering_color=config.BUTTON_HOVER_COLOR,
+            on_click=close,
+        )
+
+        cls._render_elements(screen=screen, elements=[leave_button])
+        pygame.mouse.set_cursor(cls._get_cursor(elements=[leave_button]))
+
+        for event in events:
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                cls._click_elements([leave_button])
+
+
+class LostConnectionMenu(Menu):
+
+    @classmethod
+    def start(
+        cls,
+        screen: pygame.Surface,
+        close: Callable[[], None],
+        events: list[pygame.event.Event],
+    ):
+        menu_surface = pygame.Surface(
+            size=config.RESOLUTION, flags=pygame.SRCALPHA, depth=32
+        )
+        menu_surface.convert_alpha()
+        menu_surface.fill(pygame.Color(0, 0, 0, 180))
+        screen.blit(source=menu_surface, dest=(0, 0))
+
+        OutlineText.render(
+            text="LOST CONNECTION",
+            font=get_font(80),
+            text_color=pygame.Color("white"),
+            outline_color=pygame.Color("black"),
+            outline_width=3,
+            position=(config.SCREEN.centerx, 300),
+            surface=screen,
+        )
+
+        OutlineText.render(
+            text="TO THE SERVER",
             font=get_font(80),
             text_color=pygame.Color("white"),
             outline_color=pygame.Color("black"),

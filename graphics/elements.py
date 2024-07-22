@@ -93,8 +93,7 @@ class ButtonElement(Element):
             config.BUTTON_SOUND_PATH,
             volume=GameManager.get_setting(SettingsKeys.volume),
         )
-        if self.is_input_recieved():
-            self._on_click()
+        self._on_click()
 
     def render(self, screen: pygame.Surface) -> None:
         if self.image is not None:
@@ -243,10 +242,10 @@ class BetterButtonElement(ButtonElement):
         screen.blit(self.surface, self.rect)
 
     def _toggle_color(self, is_hovering: bool):
-        disabled_color = self.base_color // pygame.Color(2, 2, 2)
-        disabled_outline_color = self.outline_color // pygame.Color(2, 2, 2)
-        disabled_text_color = self.text_color // pygame.Color(2, 2, 2)
-        disabled_text_outline_color = self.text_outline_color // pygame.Color(2, 2, 2)
+        disabled_color = self.base_color // pygame.Color(2, 2, 2, 1)
+        disabled_outline_color = self.outline_color // pygame.Color(2, 2, 2, 1)
+        disabled_text_color = self.text_color // pygame.Color(2, 2, 2, 1)
+        disabled_text_outline_color = self.text_outline_color // pygame.Color(2, 2, 2, 1)
 
         color = self.hovering_color if is_hovering else self.base_color
         self._displayed_color = color if not self.disabled else disabled_color

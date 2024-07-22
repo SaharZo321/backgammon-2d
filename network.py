@@ -64,6 +64,12 @@ class BGServer:
         address = writer.get_extra_info(name="peername")
         print(f"{address} connected to the server")
 
+        if self._game_started_event.is_set():
+            print(f"{address} joined to an active game")
+            print(f"Closing connection to {address}")
+            writer.close()
+            await writer.wait_closed()
+            return
         self._game_started_event.set()
         self.connected = True
 
