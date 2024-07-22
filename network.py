@@ -58,6 +58,11 @@ class BGServer:
     def local_get_game_state(self) -> OnlineGameState:
         return self.online_backgammon.get_online_game_state()
 
+    async def close_connection(writer: asyncio.StreamWriter, address: str):
+        print(f"Closing connection to {address}")
+        writer.close()
+        await writer.wait_closed()
+    
     async def handle_client(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ):
@@ -66,10 +71,9 @@ class BGServer:
 
         if self._game_started_event.is_set():
             print(f"{address} joined to an active game")
-            print(f"Closing connection to {address}")
-            writer.close()
-            await writer.wait_closed()
+            await self.close_connection(writer=writer, address=address)
             return
+        
         self._game_started_event.set()
         self.connected = True
 
@@ -116,10 +120,8 @@ class BGServer:
                 print(f"Connection to {address} cancelled")
                 break
 
-        print(f"Closing connection to {address}")
-        writer.close()
-        await writer.wait_closed()
-
+        await self.close_connection(writer=writer, address=address)
+    
     async def send_data(self, writer: asyncio.StreamWriter, data):
         writer.write(pickle.dumps(data))
         await writer.drain()

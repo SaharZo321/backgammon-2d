@@ -371,18 +371,21 @@ class GraphicsManager:
                 else (rect.bottom - radius * (2 * i + 1))
             )
             center = (rect.centerx, new_y)
-            self.render_piece(center, color, radius)
+            self.render_piece(
+                surface=self.surface, center=center, color=color, radius=radius
+            )
 
+    @staticmethod
     def render_piece(
-        self,
+        surface: pygame.Surface,
         center: tuple[int, int],
         color: pygame.Color,
         radius: int,
     ):
-        pygame.gfxdraw.filled_circle(self.surface, center[0], center[1], radius, color)
-        pygame.gfxdraw.aacircle(self.surface, center[0], center[1], radius, (0, 0, 0))
+        pygame.gfxdraw.filled_circle(surface, center[0], center[1], radius, color)
+        pygame.gfxdraw.aacircle(surface, center[0], center[1], radius, (0, 0, 0))
         pygame.gfxdraw.aacircle(
-            self.surface, center[0], center[1], math.floor(radius / 2), (0, 0, 0)
+            surface, center[0], center[1], math.floor(radius / 2), (0, 0, 0)
         )
 
     def render_bar_pieces(self, bar: dict[Player, int], player_colors: pygame.Color):
@@ -401,7 +404,9 @@ class GraphicsManager:
                     + (counter * 2 + 1) * radius
                 ),
             )
-            self.render_piece(counter_center, color, radius)
+            self.render_piece(
+                surface=self.surface, center=counter_center, color=color, radius=radius
+            )
 
         # player2
         color = player_colors[Player.player2]
@@ -414,7 +419,9 @@ class GraphicsManager:
                     + (counter * 2 + 1) * radius
                 ),
             )
-            self.render_piece(counter_center, color, radius)
+            self.render_piece(
+                surface=self.surface, center=counter_center, color=color, radius=radius
+            )
 
     def render_home(self, home: dict[Player, int], player_colors: pygame.Color) -> None:
 
@@ -487,3 +494,15 @@ class ColorConverter:
     def pygame_to_pydantic(pygame_color: pygame.Color) -> PydanticColor:
         rgb = pygame_color.r, pygame_color.g, pygame_color.b
         return PydanticColor(value=rgb)
+
+def gradient_surface(left_colour: pygame.Color, right_colour: pygame.Color, size: tuple[int,int]):
+    """ Draw a horizontal-gradient filled rectangle covering <target_rect> """
+    surface = pygame.Surface( ( 2, 2 ) )                                   # tiny! 2x2 bitmap
+    pygame.draw.line( surface, left_colour,  ( 0,0 ), ( 0,1 ) )            # left colour line
+    pygame.draw.line( surface, right_colour, ( 1,0 ), ( 1,1 ) )            # right colour line
+    surface = pygame.transform.smoothscale(surface, size)  # stretch!
+    return surface
+
+def draw_border(surface: pygame.Surface, width: int, color: pygame.Color):
+    pygame.draw.rect(surface, color, (0,0) + surface.get_size(), width)
+    return surface

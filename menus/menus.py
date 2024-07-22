@@ -6,6 +6,7 @@ import config
 from config import get_font
 from game_manager import GameManager, SettingsKeys
 from graphics.elements import BetterButtonElement, Element
+from graphics.graphics_manager import GraphicsManager, draw_border, gradient_surface
 from graphics.outline_text import OutlineText
 from graphics.elements import ButtonElement, SliderElement
 from menus.screen import Screen
@@ -63,33 +64,63 @@ class OptionsMenu(Menu):
             min_value=0,
             max_value=255,
             label="RED",
-            anchor={"center": (config.SCREEN.centerx, 300)},
+            anchor={"center": (config.SCREEN.centerx, 190)},
             label_color=pygame.Color("red"),
             default_value=current_color.r,
             on_value_changed=set_color,
+            label_position="top",
             id="red",
+            slider_surface=draw_border(
+                surface=gradient_surface(
+                    left_colour=pygame.Color("black"),
+                    right_colour=pygame.Color("red"),
+                    size=(150, 30),
+                ),
+                width=2,
+                color=pygame.Color("black"),
+            ),
         )
 
         green_slider = SliderElement(
             min_value=0,
             max_value=255,
             label="GREEN",
-            anchor={"center": (config.SCREEN.centerx, 350)},
+            anchor={"center": (config.SCREEN.centerx, 270)},
             default_value=current_color.g,
             on_value_changed=set_color,
             id="green",
+            label_position="top",
             label_color=pygame.Color("green"),
+            slider_surface=draw_border(
+                surface=gradient_surface(
+                    left_colour=pygame.Color("black"),
+                    right_colour=pygame.Color("green"),
+                    size=(150, 30),
+                ),
+                width=2,
+                color=pygame.Color("black"),
+            ),
         )
 
         blue_slider = SliderElement(
             min_value=0,
             max_value=255,
             label="BLUE",
-            anchor={"center": (config.SCREEN.centerx, 400)},
+            anchor={"center": (config.SCREEN.centerx, 350)},
             default_value=current_color.b,
             on_value_changed=set_color,
             id="blue",
             label_color=pygame.Color("blue"),
+            label_position="top",
+            slider_surface=draw_border(
+                surface=gradient_surface(
+                    left_colour=pygame.Color("black"),
+                    right_colour=pygame.Color("blue"),
+                    size=(150, 30),
+                ),
+                width=2,
+                color=pygame.Color("black"),
+            ),
         )
 
         def toggle_mute():
@@ -110,17 +141,21 @@ class OptionsMenu(Menu):
             padding=15,
             on_click=toggle_mute,
         )
-        
+
+        GraphicsManager.render_piece(
+            screen, center=(450, 290), color=current_color, radius=50
+        )
+
         volume_slider = SliderElement(
             min_value=0,
             max_value=1,
             label=volume_button,
-            anchor={"center": (config.SCREEN.centerx, 450)},
+            anchor={"center": (config.SCREEN.centerx, 470)},
             default_value=current_volume,
             on_value_changed=set_volume,
+            label_position="top",
             id="volume",
         )
-        
 
         back_button = ButtonElement(
             position=(config.SCREEN.centerx, 650),
@@ -133,7 +168,6 @@ class OptionsMenu(Menu):
             on_click=close,
         )
 
-
         OutlineText.render(
             text="OPTIONS",
             font=get_font(80),
@@ -141,7 +175,7 @@ class OptionsMenu(Menu):
             outline_color=pygame.Color("black"),
             outline_width=3,
             surface=screen,
-            position=(config.SCREEN.centerx, 120),
+            position=(config.SCREEN.centerx, 70),
         )
 
         elements: list[Element] = [
@@ -173,7 +207,7 @@ class ConnectingMenu(Menu):
         menu_surface.convert_alpha()
         menu_surface.fill(pygame.Color(0, 0, 0, 180))
         screen.blit(source=menu_surface, dest=(0, 0))
-        
+
         OutlineText.render(
             text="CONNECTING...",
             font=get_font(100),
