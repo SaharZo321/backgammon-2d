@@ -2,13 +2,16 @@ import math
 from typing import Callable, Literal
 import pygame
 from config import get_font
+import config
+from game_manager import GameManager, SettingsKeys
 from graphics.outline_text import OutlineText
+from sound_manager import SoundManager
 
 
 class Element:
     rect: pygame.Rect
     disabled: bool
-    
+
     def __init__(self) -> None:
         pass
         raise NotImplementedError()
@@ -17,9 +20,7 @@ class Element:
         pass
         raise NotImplementedError()
 
-    def update(
-        self, events: list[pygame.event.Event]
-    ) -> None:
+    def update(self, events: list[pygame.event.Event]) -> None:
         """
         Updates the element properties. Ususally implemented with is_input_recieved.
         """
@@ -27,167 +28,11 @@ class Element:
 
     def click(self):
         pass
-    
+
     def is_input_recieved(self) -> bool:
         mouse_position = pygame.mouse.get_pos()
-        if not self.disabled and self.rect.collidepoint(mouse_position):
-            return True
-        return False
+        return not self.disabled and self.rect.collidepoint(mouse_position)
 
-type RelativePosition = Literal["top", "bottom", "left", "right"]
-
-
-class SliderElement(Element):
-    value: int
-    min: int
-    max: int
-    rect: pygame.Rect
-    knob_width: int
-    slider_height: int
-    slider_surface: pygame.Surface
-    slider_color: pygame.Color
-    knob_color: pygame.Color
-    label: pygame.Surface
-    label_position: RelativePosition
-    label_padding: int
-    on_value_changed: Callable[[int, str], None]
-    id: str
-
-    _label_rect: pygame.Rect
-    _slider_rect: pygame.Rect
-
-    def __init__(
-        self,
-        min_value: int,
-        max_value: int,
-        rect: pygame.Rect,
-        default_value: int | None = None,
-        knob_width: int | None = None,
-        slider_height: int | None = None,
-        slider_surface: pygame.Surface | None = None,
-        slider_color: pygame.Color = pygame.Color("white"),
-        knob_color: pygame.Color = pygame.Color("white"),
-        label: str | pygame.Surface = "",
-        label_position: RelativePosition = "left",
-        label_padding: int = 10,
-        label_color: pygame.Color = pygame.Color("white"),
-        on_value_changed: Callable[[int, str], None] = lambda x: None,
-        id: str = "",
-    ) -> None:
-        self.id = id
-        self.on_value_changed = on_value_changed
-        self.min = min_value
-        self.max = max_value
-        self.rect = rect
-        self.value = default_value if default_value is not None else min_value
-        self.knob_width = (
-            knob_width
-            if knob_width is not None
-            else min(math.floor(rect.width / 12), 20)
-        )
-        self.knob_color = knob_color
-        self.slider_height = (
-            slider_height
-            if slider_height is not None and slider_height < rect.height
-            else rect.height / 3
-        )
-        self.disabled = False
-
-        if type(label) is str:
-            self.label = OutlineText.render(
-                text=label,
-                font=get_font(math.floor(rect.height * 0.8)),
-                gfcolor=label_color,
-                ocolor=pygame.Color("black"),
-            )
-        else:
-            self.label = label
-        self.label_padding = label_padding
-        self.set_label_position(label_position)
-
-        slider_size = (self.rect.width - self.knob_width, self.slider_height)
-        if type(slider_surface) is pygame.Surface:
-            self.slider_surface = pygame.transform.scale(slider_surface, slider_size)
-        else:
-            self.slider_surface = pygame.Surface(slider_size)
-            self.slider_surface.fill(slider_color)
-            pygame.draw.rect(self.slider_surface, "black", (0, 0) + (slider_size), 2)
-
-        self.slider_color = slider_color
-
-        self._slider_rect = self.slider_surface.get_rect(center=rect.center)
-
-    def render(self, surface: pygame.Surface) -> None:
-        surface.blit(self.label, self._label_rect)
-        surface.blit(self.slider_surface, self._slider_rect)
-        surface.blit(self.label, self._label_rect)
-        # render knob based on value
-        knob_surface = pygame.Surface(size=(self.knob_width, self.rect.height))
-        knob_center = self._value_to_position(self.value)
-        # print(knob_center)
-        knob_rect = knob_surface.get_rect(center=knob_center)
-        pygame.draw.rect(surface, self.knob_color, knob_rect)
-        pygame.draw.rect(surface, pygame.Color("black"), knob_rect, width=2)
-
-    def click(self):
-        print("clicked")
-
-        if self.is_input_recieved():
-            mouse_position = pygame.mouse.get_pos()
-            value = self._position_to_value(mouse_position)
-            self.set_value(value)
-
-    def update(
-        self, events: list[pygame.event.Event]
-    ) -> None:
-        mouse_position = pygame.mouse.get_pos()
-        if pygame.mouse.get_pressed()[0] and self.is_input_recieved():
-            value = self._position_to_value(mouse_position)
-            self.set_value(value)
-
-    def _value_to_position(self, value: int):
-        ratio = value / self.max
-        centerx = ratio * self._slider_rect.width + self._slider_rect.left
-        return (centerx, self._slider_rect.centery)
-
-    def _position_to_value(self, mouse_position: tuple[int, int]):
-        ratio = (mouse_position[0] - self._slider_rect.left) / self._slider_rect.width
-        return math.floor(ratio * self.max)
-
-    def set_value(self, value: int):
-        value = max(value, self.min) if value < self.min else min(value, self.max)
-        self.on_value_changed(value, self.id)
-        self.value = value
-
-    def set_label_position(self, position: RelativePosition):
-
-        self.label_position = position
-
-        match position:
-            case "left":
-                label_rect_midright = (
-                    self.rect.midleft[0] - self.label_padding,
-                    self.rect.midleft[1],
-                )
-                self._label_rect = self.label.get_rect(midright=label_rect_midright)
-            case "right":
-                label_rect_midleft = (
-                    self.rect.midright[0] + self.label_padding,
-                    self.rect.midright[1],
-                )
-                self._label_rect = self.label.get_rect(midleft=label_rect_midleft)
-            case "top":
-                label_rect_midbottom = (
-                    self.rect.midtop[0],
-                    self.rect.midtop[1] - self.label_padding,
-                )
-                self._label_rect = self.label.get_rect(midbottom=label_rect_midbottom)
-            case "bottom":
-                label_rect_midtop = (
-                    self.rect.midbottom[0],
-                    self.rect.midbottom[1] + self.label_padding,
-                )
-                self._label_rect = self.label.get_rect(midtop=label_rect_midtop)
 
 
 class ButtonElement(Element):
@@ -208,10 +53,10 @@ class ButtonElement(Element):
 
     def __init__(
         self,
-        background_image: pygame.Surface | None,
         position: tuple[int, int],
-        text_input: str,
         font: pygame.font.Font,
+        text_input: str = "",
+        image: pygame.Surface | None = None,
         base_color: pygame.Color = pygame.Color("red"),
         hovering_color: pygame.Color = pygame.Color("white"),
         outline_size: int = 1,
@@ -232,16 +77,22 @@ class ButtonElement(Element):
         self._text_rect = self._text.get_rect(
             center=(self.position[0], self.position[1])
         )
-        self._text = font.render(self.text_input, True, base_color)
-        self.image = background_image
-        if background_image is None:
-            self.image = self._text
+        self.image = image
 
-        self.rect = self.image.get_rect(center=(self.position[0], self.position[1]))
+        self.update_position(position)
         self._on_click = on_click
 
+    def update_position(self, position: tuple[int, int]):
+        if self.image is None:
+            self.rect = self._text.get_rect(center=position)
+        else:
+            self.rect = self.image.get_rect(center=position)
+
     def click(self):
-        mouse_position = pygame.mouse.get_pos()
+        SoundManager.play_sound(
+            config.BUTTON_SOUND_PATH,
+            volume=GameManager.get_setting(SettingsKeys.volume),
+        )
         if self.is_input_recieved():
             self._on_click()
 
@@ -262,22 +113,29 @@ class ButtonElement(Element):
         color = color if not self.disabled else disabled_color
 
         if self._outline_size > 0:
-            self._text = OutlineText.render(
+            self._text = OutlineText.get_surface(
                 text=self.text_input,
                 font=self._font,
-                gfcolor=color,
-                ocolor=self._outline_color,
-                opx=self._outline_size,
+                text_color=color,
+                outline_color=self._outline_color,
+                outline_width=self._outline_size,
             )
         else:
             self._text = self._font.render(self.text_input, True, color)
 
     def update(self, events: list[pygame.event.Event]) -> None:
         color = self._hovering_color if self.is_input_recieved() else self._base_color
-        self._toggle_text_color(color)
+        if self.image is None:
+            self._toggle_text_color(color)
+
+    def get_surface(self):
+        if self.image is None:
+            return self._text
+        return self.image
 
 
 class BetterButtonElement(ButtonElement):
+    image: pygame.Surface | None
     position: tuple[int, int]
     disabled: bool
     text_input: str
@@ -287,7 +145,7 @@ class BetterButtonElement(ButtonElement):
     text_outline_size: int
     text_outline_color: pygame.Color
     rect: pygame.Rect
-    
+    padding: int
     _border_radius: int
     _displayed_color: pygame.Color
     _displayed_outline_color: pygame.Color
@@ -298,12 +156,15 @@ class BetterButtonElement(ButtonElement):
 
     _text_rect: pygame.Rect
     _on_click: Callable[[], None]
+    surface: pygame.Surface
+    _surface_rect: pygame.Rect
 
     def __init__(
         self,
         position: tuple[int, int],
-        text_input: str,
-        font: pygame.font.Font,
+        font: pygame.font.Font = None,
+        text_input: str = "",
+        image: pygame.Surface | None = None,
         text_color: pygame.Color = pygame.Color("black"),
         text_outline_size: int = 0,
         text_outline_color: pygame.Color = pygame.Color("white"),
@@ -312,6 +173,7 @@ class BetterButtonElement(ButtonElement):
         outline_size: int = 3,
         outline_color: pygame.Color = pygame.Color("black"),
         border_radius: int | None = None,
+        padding: int = 10,
         on_click: Callable[[], None] = lambda: (),
     ) -> None:
 
@@ -327,16 +189,31 @@ class BetterButtonElement(ButtonElement):
         self.text_input = text_input
         self._outline_size = outline_size
         self.outline_color = outline_color
-        self._toggle_color(False)
-        self._text_rect = self._text.get_rect(
-            center=(self.position[0], self.position[1])
-        )
-        scaley = 1.1
-        scalex = (
-            (self._text_rect.height * scaley - self._text_rect.height) * 4
-            + self._text_rect.width
-        ) / self._text_rect.width
-        self.rect = self._text_rect.scale_by(scalex, scaley)
+        self.image = image
+
+        if image is None:
+            self._toggle_color(False)
+            text_rect = self._text.get_rect(center=position)
+            scaley = (text_rect.height + padding) / text_rect.height
+            scalex = (
+                text_rect.width + padding + font.get_height() / 3
+            ) / text_rect.width
+            self.rect = text_rect.scale_by(scalex, scaley)
+        else:
+            image_rect = image.get_rect(center=position)
+            scaley = (image_rect.height + padding) / image_rect.height
+            scalex = (image_rect.width + padding) / image_rect.width
+            self.rect = image_rect.scale_by(scalex, scaley)
+
+        self.surface = pygame.Surface(self.rect.size, flags=pygame.SRCALPHA, depth=32)
+        self.surface.convert_alpha()
+        self._surface_rect = self.surface.get_rect(topleft=(0, 0))
+
+        if image is None:
+            self._text_rect = self._text.get_rect(center=self._surface_rect.center)
+        else:
+            self._image_rect = image.get_rect(center=self._surface_rect.center)
+
         self._on_click = on_click
 
     def render(self, screen: pygame.Surface) -> None:
@@ -346,19 +223,24 @@ class BetterButtonElement(ButtonElement):
             else math.floor(self.rect.height / 4)
         )
         pygame.draw.rect(
-            surface=screen,
+            surface=self.surface,
             color=self._displayed_color,
-            rect=self.rect,
+            rect=self._surface_rect,
             border_radius=br,
         )
         pygame.draw.rect(
-            surface=screen,
+            surface=self.surface,
             color=self._displayed_outline_color,
-            rect=self.rect,
+            rect=self._surface_rect,
             width=self._outline_size,
             border_radius=br,
         )
-        screen.blit(self._text, self._text_rect)
+        if self.image is None:
+            self.surface.blit(self._text, self._text_rect)
+        else:
+            self.surface.blit(self.image, self._image_rect)
+
+        screen.blit(self.surface, self.rect)
 
     def _toggle_color(self, is_hovering: bool):
         disabled_color = self.base_color // pygame.Color(2, 2, 2)
@@ -371,6 +253,9 @@ class BetterButtonElement(ButtonElement):
         self._displayed_outline_color = (
             self.outline_color if not self.disabled else disabled_outline_color
         )
+        if self.image is not None:
+            return
+
         text_color = self.text_color if not self.disabled else disabled_text_color
         text_outline_color = (
             self.text_outline_color
@@ -378,18 +263,21 @@ class BetterButtonElement(ButtonElement):
             else disabled_text_outline_color
         )
         if self._outline_size > 0:
-            self._text = OutlineText.render(
+            self._text = OutlineText.get_surface(
                 text=self.text_input,
                 font=self._font,
-                gfcolor=text_color,
-                ocolor=text_outline_color,
-                opx=self.text_outline_size,
+                text_color=text_color,
+                outline_color=text_outline_color,
+                outline_width=self.text_outline_size,
             )
         else:
             self._text = self._font.render(self.text_input, True, text_color)
 
     def update(self, events: list[pygame.event.Event]) -> None:
         self._toggle_color(self.is_input_recieved())
+        
+    def get_surface(self):
+        return self.surface
 
 
 class TrackButtonElement(Element):
@@ -405,6 +293,7 @@ class TrackButtonElement(Element):
         is_top: bool,
         surface: pygame.Surface,
         surface_rect: pygame.Rect,
+        on_click: Callable[[], None] = lambda x: None,
     ) -> None:
         self.rect = rect
         self.is_top = is_top
@@ -412,6 +301,7 @@ class TrackButtonElement(Element):
         self.surface = surface
         self.surface_rect = surface_rect
         self.disabled = False
+        self.on_click = on_click
 
     def render(self) -> None:
 
@@ -435,9 +325,169 @@ class TrackButtonElement(Element):
 
     def is_input_recieved(self) -> bool:
         mouse_position = pygame.mouse.get_pos()
-        
+
         return mouse_position[0] - self.surface_rect.left in range(
             self.rect.left, self.rect.right
         ) and mouse_position[1] + self.surface_rect.top in range(
             self.rect.top, self.rect.bottom
         )
+
+
+type RelativePosition = Literal["top", "bottom", "left", "right"]
+
+
+type AnchorPosition = Literal[
+    "topleft",
+    "bottomleft",
+    "topright",
+    "bottomright",
+    "midtop",
+    "midleft",
+    "midbottom",
+    "midright",
+    "center",
+]
+
+
+class SliderElement(Element):
+    def __init__(
+        self,
+        min_value: float,
+        max_value: float,
+        anchor: dict[AnchorPosition, tuple[int, int]],
+        default_value: float | None = None,
+        slider_size: tuple[int, int] = (150, 15),
+        knob_size: tuple[int, int] = (10, 30),
+        slider_surface: pygame.Surface | None = None,
+        slider_color: pygame.Color = pygame.Color("white"),
+        knob_color: pygame.Color = pygame.Color("white"),
+        label: str | pygame.Surface | ButtonElement = "",
+        label_position: RelativePosition = "right",
+        label_padding: int = 10,
+        label_color: pygame.Color = pygame.Color("white"),
+        on_value_changed: Callable[[float, str], None] = lambda x: None,
+        id: str = "",
+    ) -> None:
+        self.id: str = id
+        self.on_value_changed: Callable[[float, str], None] = on_value_changed
+        self.min: float = min_value
+        self.max: float = max_value
+
+        self.value: float = default_value if default_value is not None else min_value
+        self.knob_size: tuple[int, int] = knob_size
+        self.slider_height = max(knob_size[1], slider_size[1])
+        self.knob_color = knob_color
+        self.slider_size = slider_size
+        self.disabled = False
+
+        self.label_padding = label_padding
+
+        if type(slider_surface) is pygame.Surface:
+            self.slider_surface = pygame.transform.scale(slider_surface, slider_size)
+        else:
+            self.slider_surface = pygame.Surface(slider_size)
+            self.slider_surface.fill(slider_color)
+            pygame.draw.rect(self.slider_surface, "black", (0, 0) + (slider_size), 2)
+
+        if type(label) is str:
+            self.label = OutlineText.get_surface(
+                text=label,
+                font=get_font(math.floor(self.slider_height * 0.8)),
+                text_color=label_color,
+                outline_color=pygame.Color("black"),
+            )
+        elif isinstance(label, ButtonElement):
+            self.label = pygame.Surface(label.get_surface().get_size(), flags=pygame.SRCALPHA, depth=32)
+            self.label.convert_alpha()
+        elif type(label) is pygame.Surface:
+            self.label = label
+        
+        label_size = self.label.get_size()
+        match label_position:
+            case "left" | "right":
+                width = slider_size[0] + label_padding + label_size[0]
+                height = max(slider_size[1], label_size[1])
+                self.rect = pygame.Surface((width, height)).get_rect(**anchor)
+            case "top" | "bottom":
+                width = max(slider_size[0], label_size[0])
+                height = slider_size[1] + label_padding + label_size[1]
+                self.rect = pygame.Surface((width, height)).get_rect(**anchor)
+        self.label_position = label_position
+        self.set_elements_position(label_position)
+        
+        if isinstance(label, ButtonElement):
+            label.rect = self._label_rect
+
+        self.slider_color = slider_color
+
+    def render(self, surface: pygame.Surface) -> None:
+        surface.blit(self.label, self._label_rect)
+        surface.blit(self.slider_surface, self._slider_rect)
+        surface.blit(self.label, self._label_rect)
+        # render knob based on value
+        knob_surface = pygame.Surface(size=self.knob_size)
+        knob_center = self._value_to_position(self.value)
+        knob_rect = knob_surface.get_rect(center=knob_center)
+        pygame.draw.rect(surface, self.knob_color, knob_rect)
+        pygame.draw.rect(surface, pygame.Color("black"), knob_rect, width=2)
+
+    def is_input_recieved(self) -> bool:
+        mouse_position = pygame.mouse.get_pos()
+        return not self.disabled and self._slider_rect.collidepoint(mouse_position)
+    
+    def click(self):
+        print("clicked")
+        SoundManager.play_sound(
+            config.BUTTON_SOUND_PATH,
+            volume=GameManager.get_setting(SettingsKeys.volume),
+        )
+
+        if self.is_input_recieved():
+            mouse_position = pygame.mouse.get_pos()
+            value = self._position_to_value(mouse_position)
+            self.set_value(value)
+
+    def update(self, events: list[pygame.event.Event]) -> None:
+        mouse_position = pygame.mouse.get_pos()
+        if pygame.mouse.get_pressed()[0] and self.is_input_recieved():
+            value = self._position_to_value(mouse_position)
+            self.set_value(value)
+
+    def _value_to_position(self, value: float):
+        ratio = value / self.max
+        centerx = ratio * self._slider_rect.width + self._slider_rect.left
+        return (centerx, self._slider_rect.centery)
+
+    def _position_to_value(self, mouse_position: tuple[int, int]):
+        ratio = (mouse_position[0] - self._slider_rect.left) / self._slider_rect.width
+        return ratio * self.max
+
+    def set_value(self, value: float):
+        value = max(value, self.min) if value < self.min else min(value, self.max)
+        self.on_value_changed(value, self.id)
+        self.value = value
+
+    def set_elements_position(self, position: RelativePosition):
+
+        match position:
+            case "left":
+                self._label_rect = self.label.get_rect(midleft=self.rect.midleft)
+                self._slider_rect = self.slider_surface.get_rect(
+                    midright=self.rect.midright
+                )
+            case "right":
+                self._label_rect = self.label.get_rect(midright=self.rect.midright)
+                self._slider_rect = self.slider_surface.get_rect(
+                    midleft=self.rect.midleft
+                )
+            case "top":
+                self._label_rect = self.label.get_rect(midtop=self.rect.midtop)
+                self._slider_rect = self.slider_surface.get_rect(
+                    midbottom=self.rect.midbottom
+                )
+            case "bottom":
+                self._label_rect = self.label.get_rect(midbottom=self.rect.midbottom)
+                self._slider_rect = self.slider_surface.get_rect(
+                    midtop=self.rect.midtop
+                )
+        

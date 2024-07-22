@@ -8,7 +8,7 @@ from config import get_font
 from game_manager import GameManager, SettingsKeys
 from graphics.elements import ButtonElement
 from graphics.graphics_manager import ColorConverter, GraphicsManager
-from menus.menus import ReconnectingMenu, UnfocusedMenu, WaitingMenu
+from menus.menus import ConnectingMenu, UnfocusedMenu, WaitingMenu
 from menus.screen import GameScreen, GameScreenButtonKeys
 from menus.menus import OptionsMenu
 from models import GameState, Move, MoveType, OnlineGameState, ScoredMoves, ServerFlags
@@ -27,10 +27,17 @@ class BotGame(GameScreen):
         graphics = GraphicsManager(screen=screen)
         ai_got_moves = False
         backgammon = Backgammon()
+        last_turn = Player.other(backgammon.get_current_turn())
 
         last_clicked_index = -1
         bot_player = Player.player2
 
+        def play_dice():
+            nonlocal last_turn
+            if backgammon.get_current_turn() != last_turn:
+                cls._play_dice_sound()
+                last_turn = backgammon.get_current_turn()
+        
         def is_bot_turn() -> bool:
             return bot_player == backgammon.get_current_turn()
 
@@ -68,6 +75,7 @@ class BotGame(GameScreen):
                 return
 
             backgammon.switch_turn()
+            
             nonlocal time
             time = pygame.time.get_ticks()
             bot_turn()
@@ -132,7 +140,7 @@ class BotGame(GameScreen):
             screen.fill("black")
             cursor = pygame.SYSTEM_CURSOR_ARROW
             GraphicsManager.render_background(screen=screen)
-
+            play_dice()
             player_colors = {
                 Player.player1: GameManager.get_setting(SettingsKeys.piece_color),
                 Player.player2: GameManager.get_setting(SettingsKeys.opponent_color),
@@ -147,12 +155,13 @@ class BotGame(GameScreen):
                 time = pygame.time.get_ticks()
                 if len(ai_moves) == 0:
                     ai_got_moves = False
-                    print("bot played")
+                    print("bot played")     
                     if backgammon.is_game_over():
                         done_button_click()
                         continue
                     backgammon.switch_turn()
                 else:
+                    cls._play_piece_sound()
                     move = ai_moves.pop()
                     print("Handled Move: ", move)
                     backgammon.handle_move(move=move)
@@ -233,8 +242,15 @@ class OfflineGame(GameScreen):
         options = False
         graphics = GraphicsManager(screen=screen)
         backgammon = Backgammon()
+        last_turn = Player.other(backgammon.get_current_turn())
         last_clicked_index = -1
 
+        def play_dice():
+            nonlocal last_turn
+            if backgammon.get_current_turn() != last_turn:
+                cls._play_dice_sound()
+                last_turn = backgammon.get_current_turn()
+                
         def is_screen_on_top():
             nonlocal options
             return options or not GameManager.is_window_focused()
@@ -305,7 +321,7 @@ class OfflineGame(GameScreen):
             clock.tick(config.FRAMERATE)
             screen.fill("black")
             cursor = pygame.SYSTEM_CURSOR_ARROW
-
+            play_dice()
             GraphicsManager.render_background(screen=screen)
 
             player_colors = {
@@ -391,7 +407,15 @@ class LocalClientGame(GameScreen):
                 GameManager.get_setting(SettingsKeys.opponent_color)
             ),
         )
-
+        last_turn = Player.other(server.local_get_game_state().current_turn)
+        
+        def play_dice():
+            nonlocal last_turn
+            turn = server.local_get_game_state().current_turn
+            if turn != last_turn:
+                cls._play_dice_sound()
+                last_turn = turn
+                
         current_state = server.local_get_game_state()
 
         last_clicked_index = -1
@@ -407,10 +431,11 @@ class LocalClientGame(GameScreen):
             server.stop_server()
             nonlocal run
             run = False
-
+        
         def save_state(state: OnlineGameState):
             nonlocal current_state
             current_state = state
+            play_dice()
 
         def done_button_click():
             save_state(server.local_done())
@@ -622,6 +647,7 @@ class OnlineClientGame(GameScreen):
             buffer_size=config.NETWORK_BUFFER,
             timeout=timeout
         )
+        last_turn = Player.player1
 
         def is_reconnecting():
             return network_client.time_from_last_recieve() > timeout / 2
@@ -630,11 +656,24 @@ class OnlineClientGame(GameScreen):
             leave_button_click()
             GameManager.quit()
         
+        def play_dice():
+            nonlocal last_turn
+            turn = current_state.current_turn
+            if turn != last_turn:
+                cls._play_dice_sound()
+                last_turn = turn
+        
         def save_state(state: OnlineGameState):
             nonlocal current_state
             current_state = state
             
             nonlocal started
+            
+            if not started:
+                cls._play_dice_sound()
+            else:
+                play_dice()
+                
             started = True
 
         def send_color():
@@ -806,7 +845,7 @@ class OnlineClientGame(GameScreen):
                     )
 
             if not network_client.has_started or is_reconnecting():
-                ReconnectingMenu.start(screen=screen)
+                ConnectingMenu.start(screen=screen)
                 if not network_client.is_connected():
                     run = False
             elif not GameManager.is_window_focused():

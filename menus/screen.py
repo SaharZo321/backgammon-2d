@@ -3,10 +3,12 @@ import math
 from backgammon import Backgammon
 import config
 from config import get_font
+from game_manager import GameManager, SettingsKeys
 from graphics.elements import ButtonElement, Element
 import pygame
 from typing import Callable
 from graphics.graphics_manager import GraphicsManager
+from sound_manager import SoundManager
 
 
 class Screen:
@@ -79,6 +81,20 @@ class GameScreenButtonKeys(Enum):
 class GameScreen(Screen):
 
     @classmethod
+    def _play_dice_sound(cls):
+        SoundManager.play_sound(
+            config.DICE_SOUND_PATH,
+            volume=GameManager.get_setting(SettingsKeys.volume),
+        )
+
+    @classmethod
+    def _play_piece_sound(cls):
+        SoundManager.play_sound(
+            config.PIECE_SOUND_PATH,
+            volume=GameManager.get_setting(SettingsKeys.volume),
+        )
+
+    @classmethod
     def _get_highlighted_tracks(cls, graphics: GraphicsManager, backgammon: Backgammon):
         index = graphics.check_track_input()
         if backgammon.get_captured_pieces() > 0:
@@ -120,6 +136,7 @@ class GameScreen(Screen):
     ):
         if graphics.check_home_track_input(player=backgammon.get_current_turn()):
             on_bear_off(last_clicked_index)
+            cls._play_piece_sound()
 
         index = graphics.check_track_input()
         if index != -1:  # clicked on track
@@ -131,8 +148,12 @@ class GameScreen(Screen):
             else:
                 if backgammon.get_captured_pieces() > 0:
                     on_leave_bar(index)
+                    cls._play_piece_sound()
+
                 else:
                     on_normal_move(index)
+                    cls._play_piece_sound()
+
 
             print(last_clicked_index)
         else:  # clicked not on a track
@@ -151,7 +172,7 @@ class GameScreen(Screen):
         left_center = math.floor(graphics.RECT.left / 2)
 
         DONE_BUTTON = ButtonElement(
-            background_image=None,
+            image=None,
             position=(right_center, 300),
             text_input="DONE",
             font=get_font(50),
@@ -161,7 +182,7 @@ class GameScreen(Screen):
         )
 
         UNDO_BUTTON = ButtonElement(
-            background_image=None,
+            image=None,
             position=(right_center, 420),
             text_input="UNDO",
             font=get_font(50),
@@ -171,7 +192,7 @@ class GameScreen(Screen):
         )
 
         LEAVE_BUTTON = ButtonElement(
-            background_image=None,
+            image=None,
             position=(
                 left_center,
                 math.floor(config.RESOLUTION[1] / 2),
@@ -184,7 +205,7 @@ class GameScreen(Screen):
         )
 
         OPTIONS_BUTTON = ButtonElement(
-            background_image=config.OPTIONS_ICON,
+            image=config.OPTIONS_ICON,
             position=(
                 config.RESOLUTION[0] - 45,
                 45,

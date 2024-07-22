@@ -142,7 +142,7 @@ class GraphicsManager:
 
     def check_track_input(self) -> int:
         """
-        Returns the index of clicked track.
+        Returns the index of hoverd track.
         If no track was clicked, -1 is returned
         """
         for index, button in enumerate(self.tracks):
@@ -283,22 +283,22 @@ class GraphicsManager:
         text = "Player1" if current_turn == Player.player1 else "Player2"
         if is_online:
             text = "YOU" if current_turn == Player.player1 else "OPPONENT"
-        TURN_TEXT = OutlineText.render(
+        TURN_TEXT = OutlineText.get_surface(
             text=text,
             font=get_font(30),
-            gfcolor=pygame.Color("white"),
-            ocolor=pygame.Color("black"),
+            text_color=pygame.Color("white"),
+            outline_color=pygame.Color("black"),
         )
         turn_center = (math.floor(self.RECT.left / 2), 130)
         TURN_TEXT_RECT = TURN_TEXT.get_rect(center=turn_center)
         self.screen.blit(TURN_TEXT, TURN_TEXT_RECT)
 
     def render_dice(self, dice: tuple[int, int]):
-        DICE_TEXT = OutlineText.render(
+        DICE_TEXT = OutlineText.get_surface(
             text=str(dice[0]) + " " + str(dice[1]),
             font=get_font(70),
-            gfcolor=pygame.Color("white"),
-            ocolor=pygame.Color("black"),
+            text_color=pygame.Color("white"),
+            outline_color=pygame.Color("black"),
         )
         buttons_center = (
             math.floor((self.RECT.right + self.screen.get_width()) / 2),
@@ -310,30 +310,30 @@ class GraphicsManager:
     def render_score(
         self, score: dict[Player, int], player_colors: dict[Player, pygame.Color]
     ):
-        COLON_SCORE_TEXT = OutlineText.render(
+        COLON_SCORE_TEXT = OutlineText.get_surface(
             text=":",
             font=get_font(70),
-            gfcolor=pygame.Color("white"),
-            ocolor=pygame.Color("black"),
+            text_color=pygame.Color("white"),
+            outline_color=pygame.Color("black"),
         )
         score_center = math.floor(self.RECT.left / 2), 60
         COLON_SCORE_TEXT_RECT = COLON_SCORE_TEXT.get_rect(center=score_center)
         self.screen.blit(COLON_SCORE_TEXT, COLON_SCORE_TEXT_RECT)
-        PLAYER1_SCORE_TEXT = OutlineText.render(
+        PLAYER1_SCORE_TEXT = OutlineText.get_surface(
             text=str(score[Player.player1]),
             font=get_font(70),
-            gfcolor=player_colors[Player.player1],
-            ocolor=pygame.Color("black"),
+            text_color=player_colors[Player.player1],
+            outline_color=pygame.Color("black"),
         )
         player1_midleft = math.floor(COLON_SCORE_TEXT_RECT.right + 10), 60
         PLAYER1_SCORE_TEXT_RECT = PLAYER1_SCORE_TEXT.get_rect(midleft=player1_midleft)
         self.screen.blit(PLAYER1_SCORE_TEXT, PLAYER1_SCORE_TEXT_RECT)
 
-        PLAYER2_SCORE_TEXT = OutlineText.render(
+        PLAYER2_SCORE_TEXT = OutlineText.get_surface(
             text=str(score[Player.player2]),
             font=get_font(70),
-            gfcolor=player_colors[Player.player2],
-            ocolor=pygame.Color("black"),
+            text_color=player_colors[Player.player2],
+            outline_color=pygame.Color("black"),
         )
         player2_midright = math.floor(COLON_SCORE_TEXT_RECT.left - 10), 60
         PLAYER2_SCORE_TEXT_RECT = PLAYER2_SCORE_TEXT.get_rect(midright=player2_midright)

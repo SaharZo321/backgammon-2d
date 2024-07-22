@@ -1,5 +1,5 @@
 import config
-from config import get_font, get_mid_width
+from config import get_font
 from game_manager import GameManager, SettingsKeys
 from graphics.elements import BetterButtonElement
 from graphics.elements import ButtonElement
@@ -41,7 +41,7 @@ class JoinRoomScreen(Screen):
             back_click()
 
         JOIN_BUTTON = BetterButtonElement(
-            position=(math.floor(get_mid_width()), 500),
+            position=(config.SCREEN.centerx, 500),
             text_input="JOIN",
             font=get_font(70),
             text_color=pygame.Color("black"),
@@ -52,8 +52,8 @@ class JoinRoomScreen(Screen):
         )
 
         BACK_BUTTON = ButtonElement(
-            background_image=None,
-            position=(get_mid_width(), 650),
+            image=None,
+            position=(config.SCREEN.centerx, 650),
             text_input="BACK",
             font=get_font(50),
             base_color=config.BUTTON_COLOR,
@@ -101,13 +101,13 @@ class JoinRoomScreen(Screen):
 
     @classmethod
     def _render_text_field(cls, text: str, screen: pygame.Surface, active=True):
-        TEXT = OutlineText.render(
+        TEXT = OutlineText.get_surface(
             text=text,
             font=get_font(80),
-            gfcolor=pygame.Color("white"),
-            ocolor=pygame.Color("black"),
+            text_color=pygame.Color("white"),
+            outline_color=pygame.Color("black"),
         )
-        TEXT_RECT = TEXT.get_rect(center=(get_mid_width(), 320))
+        TEXT_RECT = TEXT.get_rect(center=(config.SCREEN.centerx, 320))
 
         MIN_STR = "M"
 
@@ -118,7 +118,7 @@ class JoinRoomScreen(Screen):
                 True,
                 pygame.Color("white"),
             )
-            .get_rect(center=(get_mid_width(), 320))
+            .get_rect(center=(config.SCREEN.centerx, 320))
         )
 
         FIELD_BACKGROUND_RECT = (
@@ -153,13 +153,13 @@ class JoinRoomScreen(Screen):
 
         GraphicsManager.render_background(screen)
 
-        MENU_TEXT = OutlineText.render(
+        MENU_TEXT = OutlineText.get_surface(
             text="Enter IP Address",
             font=get_font(70),
-            gfcolor=pygame.Color("white"),
-            ocolor=pygame.Color("black"),
+            text_color=pygame.Color("white"),
+            outline_color=pygame.Color("black"),
         )
-        MENU_RECT = MENU_TEXT.get_rect(center=(get_mid_width(), 80))
+        MENU_RECT = MENU_TEXT.get_rect(center=(config.SCREEN.centerx, 80))
         screen.blit(MENU_TEXT, MENU_RECT)
 
         cls._render_elements(screen=screen, elements=buttons)
@@ -185,7 +185,7 @@ class OnlineScreen(Screen):
             back_click()
 
         JOIN_ROOM_BUTTON = BetterButtonElement(
-            position=(math.floor(get_mid_width()), 270),
+            position=(config.SCREEN.centerx, 270),
             text_input="JOIN ROOM",
             font=get_font(70),
             text_color=pygame.Color("black"),
@@ -196,7 +196,7 @@ class OnlineScreen(Screen):
         )
 
         CREATE_ROOM_BUTTON = BetterButtonElement(
-            position=(math.floor(get_mid_width()), 420),
+            position=(config.SCREEN.centerx, 420),
             text_input="CREATE ROOM",
             font=get_font(70),
             text_color=pygame.Color("black"),
@@ -207,8 +207,8 @@ class OnlineScreen(Screen):
         )
 
         BACK_BUTTON = ButtonElement(
-            background_image=None,
-            position=(get_mid_width(), 650),
+            image=None,
+            position=(config.SCREEN.centerx, 650),
             text_input="BACK",
             font=get_font(50),
             base_color=config.BUTTON_COLOR,
@@ -262,8 +262,8 @@ class PlayScreen(Screen):
             OnlineScreen.start(screen, clock)
 
         ONLINE_BUTTON = ButtonElement(
-            background_image=None,
-            position=(get_mid_width(), 180),
+            image=None,
+            position=(config.SCREEN.centerx, 180),
             text_input="PLAY ON LAN",
             font=get_font(75),
             base_color=config.BUTTON_COLOR,
@@ -274,8 +274,8 @@ class PlayScreen(Screen):
         )
 
         BOT_BUTTON = ButtonElement(
-            background_image=None,
-            position=(get_mid_width(), 330),
+            image=None,
+            position=(config.SCREEN.centerx, 330),
             text_input="PLAY AGAINST BOT",
             font=get_font(75),
             base_color=config.BUTTON_COLOR,
@@ -286,8 +286,8 @@ class PlayScreen(Screen):
         )
 
         OFFLINE_BUTTON = ButtonElement(
-            background_image=None,
-            position=(get_mid_width(), 480),
+            image=None,
+            position=(config.SCREEN.centerx, 480),
             text_input="PLAY 1v1",
             font=get_font(75),
             base_color=config.BUTTON_COLOR,
@@ -298,8 +298,8 @@ class PlayScreen(Screen):
         )
 
         BACK_BUTTON = ButtonElement(
-            background_image=None,
-            position=(get_mid_width(), 650),
+            image=None,
+            position=(config.SCREEN.centerx, 650),
             text_input="BACK",
             font=get_font(50),
             base_color=config.BUTTON_COLOR,
@@ -358,16 +358,16 @@ class MainScreen(Screen):
         def quit_button_click():
             GameManager.quit()
 
-        MENU_TEXT = OutlineText.render(
+        main_menu = OutlineText(
             text="MAIN MANU",
             font=get_font(100),
-            gfcolor=pygame.Color("white"),
-            ocolor=pygame.Color("black"),
+            text_color=pygame.Color("white"),
+            outline_color=pygame.Color("black"),
+            position=(config.SCREEN.centerx, 100),
         )
-        MENU_RECT = MENU_TEXT.get_rect(center=(get_mid_width(), 100))
 
         PLAY_BUTTON = BetterButtonElement(
-            position=(get_mid_width(), 300),
+            position=(config.SCREEN.centerx, 300),
             text_input="PLAY",
             font=get_font(75),
             base_color=config.BUTTON_COLOR,
@@ -376,7 +376,7 @@ class MainScreen(Screen):
         )
 
         OPTIONS_BUTTON = BetterButtonElement(
-            position=(get_mid_width(), 450),
+            position=(config.SCREEN.centerx, 450),
             text_input="OPTIONS",
             font=get_font(75),
             base_color=config.BUTTON_COLOR,
@@ -385,8 +385,8 @@ class MainScreen(Screen):
         )
 
         QUIT_BUTTON = ButtonElement(
-            background_image=None,
-            position=(get_mid_width(), 650),
+            image=None,
+            position=(config.SCREEN.centerx, 650),
             text_input="QUIT",
             font=get_font(50),
             base_color=config.BUTTON_COLOR,
@@ -402,7 +402,7 @@ class MainScreen(Screen):
 
             GraphicsManager.render_background(screen=screen)
 
-            screen.blit(MENU_TEXT, MENU_RECT)
+            main_menu.update(screen)
 
             cls._render_elements(screen=screen, elements=buttons)
             pygame.mouse.set_cursor(cls._get_cursor(elements=buttons))

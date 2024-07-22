@@ -8,6 +8,8 @@ class SettingsKeys(IntEnum):
     ip = auto()
     piece_color = auto()
     opponent_color = auto()
+    volume = auto()
+    mute_volume = auto()
 
 
 class GameManager:
@@ -18,18 +20,21 @@ class GameManager:
 
     @classmethod
     def start(cls):
-        _options_menu = False
         cls._options = {
             SettingsKeys.ip: "",
             SettingsKeys.opponent_color: pygame.Color(150, 100, 100),
             SettingsKeys.piece_color: pygame.Color(100, 100, 100),
+            SettingsKeys.volume: 1,
+            SettingsKeys.mute_volume: 1,
+            
         }
         pygame.init()
         pygame.font.init()
+        pygame.mixer.init()
         pygame.display.set_caption("Backgammon")
         cls.clock = pygame.time.Clock()
         cls.screen = pygame.display.set_mode(config.RESOLUTION)
-        pygame.display.set_icon(config.ICON)
+        pygame.display.set_icon(config.GAME_ICON)
 
     @staticmethod
     def quit():

@@ -6,7 +6,6 @@ import config
 from config import get_font
 from game_manager import GameManager, SettingsKeys
 from graphics.elements import BetterButtonElement, Element
-from config import get_mid_width
 from graphics.outline_text import OutlineText
 from graphics.elements import ButtonElement, SliderElement
 from menus.screen import Screen
@@ -15,7 +14,12 @@ import pygame
 
 class Menu(Screen):
     @classmethod
-    def start(cls, screen: pygame.Surface, close: Callable[[], None], events: list[pygame.event.Event]):
+    def start(
+        cls,
+        screen: pygame.Surface,
+        close: Callable[[], None],
+        events: list[pygame.event.Event],
+    ):
         pass
         raise NotImplementedError()
 
@@ -37,65 +41,89 @@ class OptionsMenu(Menu):
             menu_surface.fill(pygame.Color(0, 0, 0, 200))
             screen.blit(source=menu_surface, dest=(0, 0))
 
-        def visuals_button_click():
-            pass
-        
-        current_color: pygame.Color = GameManager.get_setting(key=SettingsKeys.piece_color)
-        
-        def set_color(value: int, id: str):
+        current_color: pygame.Color = GameManager.get_setting(
+            key=SettingsKeys.piece_color
+        )
+        current_volume: float = GameManager.get_setting(key=SettingsKeys.volume)
+
+        def set_volume(value: float, id: str = None):
+            GameManager.set_setting(key=SettingsKeys.volume, value=value)
+
+        def set_color(value: float, id: str):
             color = {
                 "red": current_color.r,
                 "green": current_color.g,
                 "blue": current_color.b,
             }
-            color[id] = value
+            color[id] = math.floor(value)
             new_color = pygame.Color(color["red"], color["green"], color["blue"])
             GameManager.set_setting(key=SettingsKeys.piece_color, value=new_color)
-        
+
         red_slider = SliderElement(
             min_value=0,
             max_value=255,
             label="RED",
-            rect=pygame.Rect(150, 50, 150, 30),
+            anchor={"center": (config.SCREEN.centerx, 300)},
+            label_color=pygame.Color("red"),
             default_value=current_color.r,
             on_value_changed=set_color,
-            id="red"
+            id="red",
         )
-        
+
         green_slider = SliderElement(
             min_value=0,
             max_value=255,
             label="GREEN",
-            rect=pygame.Rect(150, 100, 150, 30),
+            anchor={"center": (config.SCREEN.centerx, 350)},
             default_value=current_color.g,
             on_value_changed=set_color,
-            id="green"
+            id="green",
+            label_color=pygame.Color("green"),
         )
-        
+
         blue_slider = SliderElement(
             min_value=0,
             max_value=255,
             label="BLUE",
-            rect=pygame.Rect(150, 150, 150, 30),
+            anchor={"center": (config.SCREEN.centerx, 400)},
             default_value=current_color.b,
             on_value_changed=set_color,
-            id="blue"
+            id="blue",
+            label_color=pygame.Color("blue"),
         )
 
-        VISUALS_BUTTON = ButtonElement(
-            background_image=None,
-            position=(get_mid_width(), 270),
-            text_input="EXAMPLE",
-            font=get_font(75),
+        def toggle_mute():
+            if current_volume > 0:
+                GameManager.set_setting(SettingsKeys.mute_volume, current_volume)
+                set_volume(0)
+            else:
+                set_volume(GameManager.get_setting(SettingsKeys.mute_volume))
+
+        volume_button = BetterButtonElement(
+            position=(50, 50),
+            image=pygame.transform.scale(
+                config.MUTE_ICON if current_volume == 0 else config.VOLUME_ICON,
+                (30, 30),
+            ),
             base_color=config.BUTTON_COLOR,
             hovering_color=config.BUTTON_HOVER_COLOR,
-            outline_color=pygame.Color("black"),
-            on_click=visuals_button_click,
+            padding=15,
+            on_click=toggle_mute,
         )
+        
+        volume_slider = SliderElement(
+            min_value=0,
+            max_value=1,
+            label=volume_button,
+            anchor={"center": (config.SCREEN.centerx, 450)},
+            default_value=current_volume,
+            on_value_changed=set_volume,
+            id="volume",
+        )
+        
 
-        BACK_BUTTON = ButtonElement(
-            background_image=None,
-            position=(get_mid_width(), 650),
+        back_button = ButtonElement(
+            position=(config.SCREEN.centerx, 650),
             text_input="BACK",
             font=get_font(50),
             base_color=config.BUTTON_COLOR,
@@ -105,7 +133,26 @@ class OptionsMenu(Menu):
             on_click=close,
         )
 
-        elements: list[Element] = [VISUALS_BUTTON, BACK_BUTTON] + [green_slider, red_slider, blue_slider]
+
+        OutlineText.render(
+            text="OPTIONS",
+            font=get_font(80),
+            text_color=pygame.Color("white"),
+            outline_color=pygame.Color("black"),
+            outline_width=3,
+            surface=screen,
+            position=(config.SCREEN.centerx, 120),
+        )
+
+        elements: list[Element] = [
+            back_button,
+            volume_button,
+            green_slider,
+            red_slider,
+            blue_slider,
+            volume_slider,
+            volume_button,
+        ]
 
         pygame.mouse.set_cursor(cls._get_cursor(elements=elements))
         cls._render_elements(screen=screen, elements=elements)
@@ -116,7 +163,7 @@ class OptionsMenu(Menu):
                 cls._click_elements(elements=elements)
 
 
-class ReconnectingMenu(Menu):
+class ConnectingMenu(Menu):
 
     @classmethod
     def start(cls, screen: pygame.Surface) -> None:
@@ -127,19 +174,17 @@ class ReconnectingMenu(Menu):
         menu_surface.fill(pygame.Color(0, 0, 0, 180))
         screen.blit(source=menu_surface, dest=(0, 0))
 
-        CONNECTING = OutlineText.render(
-            text="RECONNECTING...",
+        OutlineText.render(
+            text="CONNECTING...",
             font=get_font(100),
-            gfcolor=pygame.Color("white"),
-            ocolor=pygame.Color("black"),
-            opx=3,
+            text_color=pygame.Color("white"),
+            outline_color=pygame.Color("black"),
+            outline_width=3,
+            surface=screen,
+            position=(config.SCREEN.centerx, 300),
         )
 
         pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
-
-        CONNECTING_TEXT_RECT = CONNECTING.get_rect(center=(get_mid_width(), 300))
-
-        screen.blit(CONNECTING, CONNECTING_TEXT_RECT)
 
 
 class UnfocusedMenu(Menu):
@@ -153,27 +198,27 @@ class UnfocusedMenu(Menu):
         menu_surface.fill(pygame.Color(0, 0, 0, 180))
         screen.blit(source=menu_surface, dest=(0, 0))
 
-        UNFOCUSED = OutlineText.render(
+        OutlineText.render(
             text="UNFOCUSED...",
             font=get_font(100),
-            gfcolor=pygame.Color("white"),
-            ocolor=pygame.Color("black"),
-            opx=3,
+            text_color=pygame.Color("white"),
+            outline_color=pygame.Color("black"),
+            outline_width=3,
+            position=(config.SCREEN.centerx, math.floor(config.RESOLUTION[1] / 2.5)),
         )
 
         pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
-
-        UNFOCUSED_TEXT_RECT = UNFOCUSED.get_rect(
-            center=(get_mid_width(), math.floor(config.RESOLUTION[1] / 2.5))
-        )
-
-        screen.blit(UNFOCUSED, UNFOCUSED_TEXT_RECT)
 
 
 class WaitingMenu(Menu):
 
     @classmethod
-    def start(cls, screen: pygame.Surface, close: Callable[[], None], events: list[pygame.event.Event]):
+    def start(
+        cls,
+        screen: pygame.Surface,
+        close: Callable[[], None],
+        events: list[pygame.event.Event],
+    ):
         menu_surface = pygame.Surface(
             size=config.RESOLUTION, flags=pygame.SRCALPHA, depth=32
         )
@@ -181,32 +226,28 @@ class WaitingMenu(Menu):
         menu_surface.fill(pygame.Color(0, 0, 0, 180))
         screen.blit(source=menu_surface, dest=(0, 0))
 
-        PLAYER2_TEXT = OutlineText.render(
+        OutlineText.render(
             text="PLAYER 2 NOT CONNECTED",
             font=get_font(60),
-            gfcolor=pygame.Color("white"),
-            ocolor=pygame.Color("black"),
-            opx=3,
+            text_color=pygame.Color("white"),
+            outline_color=pygame.Color("black"),
+            outline_width=3,
+            position=(config.SCREEN.centerx, 200),
+            surface=screen,
         )
 
-        PLAYER2_TEXT_RECT = PLAYER2_TEXT.get_rect(center=(get_mid_width(), 200))
-
-        screen.blit(PLAYER2_TEXT, PLAYER2_TEXT_RECT)
-
-        WATING_TEXT = OutlineText.render(
+        OutlineText.render(
             text="WATING",
             font=get_font(80),
-            gfcolor=pygame.Color("white"),
-            ocolor=pygame.Color("black"),
-            opx=3,
+            text_color=pygame.Color("white"),
+            outline_color=pygame.Color("black"),
+            outline_width=3,
+            position=(config.SCREEN.centerx, 400),
+            surface=screen,
         )
 
-        WATING_TEXT_RECT = WATING_TEXT.get_rect(center=(get_mid_width(), 400))
-
-        screen.blit(WATING_TEXT, WATING_TEXT_RECT)
-
         leave_button = BetterButtonElement(
-            position=(get_mid_width(), 650),
+            position=(config.SCREEN.centerx, 650),
             text_input="LEAVE",
             font=get_font(50),
             base_color=config.BUTTON_COLOR,
