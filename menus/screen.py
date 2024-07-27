@@ -1,13 +1,15 @@
-from enum import Enum
+from enum import Enum, StrEnum, auto
 import math
-from backgammon import Backgammon
+import time
+from backgammon import Backgammon, BackgammonAI
 import config
 from config import get_font
 from game_manager import GameManager, SettingsKeys
-from graphics.elements import ButtonElement, Element
+from graphics.elements import ButtonElement, Element, TimerElement
 import pygame
-from typing import Callable
+from typing import Callable, Union
 from graphics.graphics_manager import GraphicsManager
+from models import GameState, Move, Player, Position, ScoredMoves
 from sound_manager import SoundManager
 
 
@@ -18,15 +20,15 @@ class Screen:
         raise NotImplementedError()
 
     @classmethod
-    def _render_elements(
+    def render_elements(
         cls,
         screen: pygame.Surface,
         elements: list[Element],
-        condition=True,
-        events: list[pygame.event.Event] = [],
+        events: list[pygame.event.Event],
+        update_condition=True,
     ):
         for element in elements:
-            if condition:
+            if update_condition:
                 element.update(events)
             element.render(screen)
 
@@ -37,192 +39,303 @@ class Screen:
         return pygame.SYSTEM_CURSOR_ARROW
 
     @classmethod
-    def _click_elements(cls, elements: list[Element]):
-
+    def click_elements(cls, elements: list[Element], events: list[pygame.event.Event]):
+        clicked = False
         for element in elements:
-            if element.is_input_recieved():
-                print("clicked")
-                element.click()
+            clicked = element.click(events)
+            if clicked:
                 break
 
     @classmethod
-    def _next_text(
-        cls,
-        event: pygame.event.Event,
-        current_text: str = "",
-        on_escape: Callable[[], None] = lambda: None,
-        on_enter: Callable[[], None] = lambda: None,
-    ) -> str:
-        if event.key == pygame.K_BACKSPACE:
-            # get text input from 0 to -1 i.e. end.
-            return current_text[:-1]
-        elif event.key == pygame.K_ESCAPE:
-            on_escape()
-        elif event.key == pygame.K_KP_ENTER or event.key == pygame.K_RETURN:
-            on_enter()
-        else:
-            # Unicode standard is used for string formation
-            return current_text + event.unicode
-        return current_text
-
-    @classmethod
-    def _check_quit(cls, event: pygame.event.Event, quit: Callable[[], None]):
-        if event.type == pygame.QUIT:
+    def check_quit(cls, events: list[pygame.event.Event], quit: Callable[[], None]):
+        if any(event.type == pygame.QUIT for event in events):
             quit()
 
 
-class GameScreenButtonKeys(Enum):
-    done = ("done",)
-    undo = ("undo",)
-    leave = ("leave",)
-    options = ("options",)
+class GameScreenElementKeys(StrEnum):
+    done = auto()
+    undo = auto()
+    leave = auto()
+    options = auto()
+    timer = auto()
 
 
 class GameScreen(Screen):
 
-    @classmethod
-    def _play_dice_sound(cls):
-        SoundManager.play_sound(
-            config.DICE_SOUND_PATH,
-            volume=GameManager.get_setting(SettingsKeys.volume),
-        )
+    done_button = ButtonElement(
+        text_input="DONE",
+        font=get_font(50),
+        base_color=config.BUTTON_COLOR,
+        hovering_color=config.BUTTON_HOVER_COLOR,
+    )
+
+    undo_button = ButtonElement(
+        text_input="UNDO",
+        font=get_font(50),
+        base_color=config.BUTTON_COLOR,
+        hovering_color=config.BUTTON_HOVER_COLOR,
+    )
+
+    leave_button = ButtonElement(
+        text_input="LEAVE",
+        font=get_font(50),
+        base_color=config.BUTTON_COLOR,
+        hovering_color=config.BUTTON_HOVER_COLOR,
+    )
+
+    options_button = ButtonElement(
+        image=config.OPTIONS_ICON,
+        text_input="",
+        font=get_font(50),
+        base_color=config.BUTTON_COLOR,
+        hovering_color=config.BUTTON_HOVER_COLOR,
+    )
+
+    timer = TimerElement(
+        font=get_font(50),
+        timer_type="sec",
+        threshold=10,
+    )
+
+    game_buttons = [done_button, undo_button]
+    always_on_buttons = [leave_button, options_button]
+    all_elements: list[Element] = game_buttons + always_on_buttons + [timer]
+
+    ai_moves: list[Move]
+    bot = False
+    bot_current_time: float = 0
+    backgammon: Backgammon
+    run = True
+    options = False
+    graphics: GraphicsManager
+    last_clicked_index = -1
+    highlighted_indexes: list[int] = []
 
     @classmethod
-    def _play_piece_sound(cls):
-        SoundManager.play_sound(
+    def play_piece_sound(cls):
+        SoundManager.play(
             config.PIECE_SOUND_PATH,
             volume=GameManager.get_setting(SettingsKeys.volume),
         )
 
     @classmethod
-    def _get_highlighted_tracks(cls, graphics: GraphicsManager, backgammon: Backgammon):
-        index = graphics.check_track_input()
-        if backgammon.get_captured_pieces() > 0:
-            return backgammon.get_bar_leaving_positions()
-        elif index != -1 and backgammon.is_start_valid(index):
-            possible_tracks = backgammon.get_possible_tracks(index)
+    def get_highlighted_tracks(cls):
+        index = cls.last_clicked_index
+        if cls.backgammon.get_captured_pieces() > 0:
+            return cls.backgammon.get_bar_leaving_positions()
+        elif index != -1 and cls.backgammon.is_start_valid(index):
+            possible_tracks = cls.backgammon.get_possible_tracks(index)
             return possible_tracks + [index] if len(possible_tracks) > 0 else []
         else:
-            return backgammon.get_movable_pieces()
+            return cls.backgammon.get_movable_pieces()
 
     @classmethod
     def get_cursor(
         cls,
-        graphics: GraphicsManager,
-        buttons: list[ButtonElement],
-        backgammon: Backgammon,
+        elements: list[ButtonElement],
         condition=True,
     ):
 
         if condition and (
-            graphics.check_track_input() != -1
-            or graphics.check_home_track_input(player=backgammon.get_current_turn())
-            or any(button.is_input_recieved() for button in buttons)
+            cls.graphics.check_track_input() != -1
+            or cls.graphics.check_home_track_input(player=cls.backgammon.current_turn)
+            or any(button.is_input_recieved() for button in elements)
         ):
             return pygame.SYSTEM_CURSOR_HAND
         return pygame.SYSTEM_CURSOR_ARROW
 
     @classmethod
-    def _move_piece(
-        cls,
-        on_bear_off: Callable[[int], None],
-        on_normal_move: Callable[[int], None],
-        on_leave_bar: Callable[[int], None],
-        on_choose_piece: Callable[[int], None],
-        on_random_click: Callable[[], None],
-        graphics: GraphicsManager,
-        backgammon: Backgammon,
-        last_clicked_index: int,
-    ):
-        if graphics.check_home_track_input(player=backgammon.get_current_turn()):
-            on_bear_off(last_clicked_index)
-            cls._play_piece_sound()
+    def move_piece(cls, events: list[pygame.event.Event]):
+        if not any(
+            event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
+            for event in events
+        ):
+            return
 
-        index = graphics.check_track_input()
-        if index != -1:  # clicked on track
+        index = cls.graphics.check_track_input()
+        
+        if cls.graphics.check_home_track_input(player=cls.backgammon.current_turn):
+            cls.on_bear_off()
+            cls.play_piece_sound()
+        elif index != -1:  # clicked on track
             if (
-                last_clicked_index == -1 and backgammon.get_captured_pieces() == 0
+                cls.last_clicked_index == -1 and cls.backgammon.get_captured_pieces() == 0
             ):  # clicked on a movable piece
-                on_choose_piece(index)
+                cls.on_choose_piece(index)
 
             else:
-                if backgammon.get_captured_pieces() > 0:
-                    on_leave_bar(index)
-                    cls._play_piece_sound()
+                if cls.backgammon.get_captured_pieces() > 0:
+                    cls.on_leave_bar(index)
+                    cls.play_piece_sound()
 
                 else:
-                    on_normal_move(index)
-                    cls._play_piece_sound()
+                    cls.on_normal_move(index)
+                    cls.play_piece_sound()
 
-
-            print(last_clicked_index)
+            print(cls.last_clicked_index)
         else:  # clicked not on a track
-            on_random_click()
+            cls.on_random_click()
 
     @classmethod
-    def _get_buttons(
-        cls,
-        on_leave: Callable[[], None],
-        on_options: Callable[[], None],
-        on_done: Callable[[int], None],
-        on_undo: Callable[[int], None],
-        graphics: GraphicsManager,
+    def set_up_elements(
+        cls
     ):
-        right_center = math.floor((graphics.RECT.right + config.RESOLUTION[0]) / 2)
-        left_center = math.floor(graphics.RECT.left / 2)
+        right_center = math.floor((cls.graphics.RECT.right + config.RESOLUTION[0]) / 2)
+        left_center = math.floor(cls.graphics.RECT.left / 2)
 
-        DONE_BUTTON = ButtonElement(
-            image=None,
-            position=(right_center, 300),
-            text_input="DONE",
-            font=get_font(50),
-            base_color=config.BUTTON_COLOR,
-            hovering_color=config.BUTTON_HOVER_COLOR,
-            on_click=on_done,
+        cls.done_button.disabled = True
+        cls.done_button.position = Position(
+            anchor="midbottom", coords=(right_center, config.SCREEN.centery)
+        )
+        cls.done_button.on_click = cls.done_turn
+
+        cls.leave_button.position = Position(
+            coords=(left_center, config.SCREEN.centery)
+        )
+        cls.leave_button.on_click = cls.stop
+
+        cls.options_button.position = Position(
+            anchor="topright", coords=(config.SCREEN.width - 12, 12)
+        )
+        cls.options_button.on_click = cls.open_options
+
+        cls.undo_button.position = Position(
+            anchor="midtop", coords=(right_center, config.SCREEN.centery)
+        )
+        cls.undo_button.on_click = cls.undo_move
+
+        cls.timer.position = Position(coords=(right_center, 200))
+        cls.timer.on_done = cls.setup_bot
+
+    @classmethod
+    def next_turn(cls):
+        cls.timer.start(config.TIMER)
+        SoundManager.play(
+            config.DICE_SOUND_PATH,
+            volume=GameManager.get_setting(SettingsKeys.volume),
         )
 
-        UNDO_BUTTON = ButtonElement(
-            image=None,
-            position=(right_center, 420),
-            text_input="UNDO",
-            font=get_font(50),
-            base_color=config.BUTTON_COLOR,
-            hovering_color=config.BUTTON_HOVER_COLOR,
-            on_click=on_undo,
-        )
+    @classmethod
+    def setup_bot(cls):
+        if not cls.is_my_turn():
+            return
+        
+        def save_ai_moves(scored_moves: ScoredMoves):
+            cls.ai_moves = scored_moves.moves
+            print(cls.ai_moves)
 
-        LEAVE_BUTTON = ButtonElement(
-            image=None,
-            position=(
-                left_center,
-                math.floor(config.RESOLUTION[1] / 2),
-            ),
-            text_input="LEAVE",
-            font=get_font(50),
-            base_color=config.BUTTON_COLOR,
-            hovering_color=config.BUTTON_HOVER_COLOR,
-            on_click=on_leave,
-        )
+        cls.bot = True
+        cls.bot_current_time = time.time()
+        BackgammonAI.get_best_move(game=cls.backgammon, callback=save_ai_moves)
+    
+    @classmethod
+    def move_bot(
+        cls,
+        on_game_over: Callable[[], None] = lambda: None,
+        on_move: Callable[[Move], None] = lambda x: None,
+    ):
+        cls.bot_current_time = time.time()
+        if len(cls.ai_moves) == 0:
+            print("bot played")
+            cls.bot = False
+            if cls.backgammon.is_game_over():
+                on_game_over()
+                return
+            cls.done_turn()
+        else:
+            cls.play_piece_sound()
+            move = cls.ai_moves.pop()
+            print("Handled Move: ", move)
+            cls.backgammon.handle_move(move=move)
+            on_move(move)
 
-        OPTIONS_BUTTON = ButtonElement(
-            image=config.OPTIONS_ICON,
-            position=(
-                config.RESOLUTION[0] - 45,
-                45,
-            ),
-            text_input="",
-            font=get_font(50),
-            base_color=config.BUTTON_COLOR,
-            hovering_color=config.BUTTON_HOVER_COLOR,
-            on_click=on_options,
-        )
+    @classmethod
+    def is_my_turn(cls):
+        pass
+        raise NotImplementedError
 
-        DONE_BUTTON.toggle()
-        UNDO_BUTTON.toggle()
+    @classmethod
+    def is_screen_on_top(cls):
+        pass
+        raise NotImplementedError
 
-        return {
-            GameScreenButtonKeys.done: DONE_BUTTON,
-            GameScreenButtonKeys.undo: UNDO_BUTTON,
-            GameScreenButtonKeys.leave: LEAVE_BUTTON,
-            GameScreenButtonKeys.options: OPTIONS_BUTTON,
+    @classmethod
+    def open_options(cls):
+        cls.options = True
+
+    @classmethod
+    def close_options(cls):
+        cls.options = False
+
+    @classmethod
+    def stop(cls):
+        pass
+        raise NotImplementedError
+
+    @classmethod
+    def on_random_click(cls):
+        pass
+        raise NotImplementedError
+
+    @classmethod
+    def on_normal_move(cls, clicked_index: int):
+        pass
+        raise NotImplementedError
+
+    @classmethod
+    def on_leave_bar(cls, clicked_index: int):
+        pass
+        raise NotImplementedError
+
+    @classmethod
+    def on_bear_off(cls):
+        pass
+        raise NotImplementedError
+
+    @classmethod
+    def on_choose_piece(cls, clicked_index: int):
+        pass
+        raise NotImplementedError
+
+    @classmethod
+    def highlight_tracks(cls, is_my_turn = True):
+        cls.highlighted_indexes = []
+
+        if not cls.is_screen_on_top() and not cls.bot and is_my_turn:
+            cls.highlighted_indexes = cls.get_highlighted_tracks()
+
+        cls.graphics.highlight_tracks(cls.highlighted_indexes)
+        
+    @classmethod
+    def done_turn(cls):
+        pass
+        raise NotImplementedError
+    
+    @classmethod
+    def undo_move(cls):
+        pass
+        raise NotImplementedError
+    
+    @classmethod
+    def render_board(cls, is_online = True, opponent_color: pygame.Color | None = None):
+        player_colors = {
+            Player.player1: GameManager.get_setting(SettingsKeys.piece_color),
+            Player.player2: GameManager.get_setting(SettingsKeys.opponent_color) if opponent_color is None else opponent_color,
         }
+        cls.graphics.render_board(
+            game_state=cls.backgammon.state, player_colors=player_colors, is_online=is_online
+        )
+        
+    @classmethod
+    def update_game_buttons(cls):
+        cls.done_button.disabled = (
+            not cls.backgammon.is_turn_done() or not cls.is_my_turn() or cls.bot
+        )
+        cls.undo_button.disabled = (
+            not cls.has_history() or not cls.is_my_turn() or cls.bot
+        )
+        
+    @classmethod
+    def has_history(cls):
+        pass
+        raise NotImplementedError

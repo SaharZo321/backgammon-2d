@@ -58,7 +58,7 @@ class BGServer:
     def local_get_game_state(self) -> OnlineGameState:
         return self.online_backgammon.get_online_game_state()
 
-    async def close_connection(writer: asyncio.StreamWriter, address: str):
+    async def close_connection(self, writer: asyncio.StreamWriter, address: str):
         print(f"Closing connection to {address}")
         writer.close()
         await writer.wait_closed()
@@ -69,7 +69,7 @@ class BGServer:
         address = writer.get_extra_info(name="peername")
         print(f"{address} connected to the server")
 
-        if self._game_started_event.is_set():
+        if self.connected:
             print(f"{address} joined to an active game")
             await self.close_connection(writer=writer, address=address)
             return
@@ -90,26 +90,25 @@ class BGServer:
                 if request == ServerFlags.get_current_state:
                     pass
                 elif request == ServerFlags.undo:
-                    self.local_undo()
+                    self.undo_move()
                 elif request == ServerFlags.done:
-                    self.local_done()
+                    self.done_turn()
                 elif request == ServerFlags.leave:
                     print(f"Player2 ({address}) left the game.")
+                    
                     self.connected = False
-                    response = self.online_backgammon.manipulate_board()
-                    writer.write(pickle.dumps(response))
                     self.online_backgammon.is_player2_connected = False
                     break
                 elif type(request) is Move:
                     manipulated_move: Move = request
                     move = self.online_backgammon.manipulate_move(move=manipulated_move)
-                    self.local_move(move)
+                    self.move_piece(move)
                 elif type(request) is Color:
                     self.online_backgammon.online_color = request
 
                 response = self.online_backgammon.manipulate_board()
                 await self.send_data(writer=writer, data=response)
-                print(f"Data sent back to: {address}: {response}")
+                print(f"Data sent back to: {address}: {type(response)}")
 
             except TimeoutError:
                 print(f"Lost connection to {address}: waiting for connection")
@@ -119,7 +118,7 @@ class BGServer:
                 self.connected = False
                 print(f"Connection to {address} cancelled")
                 break
-
+        
         await self.close_connection(writer=writer, address=address)
     
     async def send_data(self, writer: asyncio.StreamWriter, data):
@@ -173,15 +172,16 @@ class BGServer:
             self.server_thread.join()
             self.server_thread = None
 
-    def has_started(self) -> bool:
+    @property
+    def game_started(self) -> bool:
         return self._game_started_event.is_set()
 
-    def local_move(self, move: Move) -> OnlineGameState:
+    def move_piece(self, move: Move) -> OnlineGameState:
         backgammon = self._get_game()
         backgammon.handle_move(move=move)
         return self.local_get_game_state()
 
-    def local_done(self) -> OnlineGameState:
+    def done_turn(self) -> OnlineGameState:
         backgammon = self._get_game()
         if not backgammon.is_turn_done():
             return self.local_get_game_state()
@@ -193,7 +193,7 @@ class BGServer:
 
         return self.local_get_game_state()
 
-    def local_undo(self) -> OnlineGameState:
+    def undo_move(self) -> OnlineGameState:
         backgammon = self._get_game()
         backgammon.undo()
         return self.local_get_game_state()
@@ -284,6 +284,9 @@ class NetworkClient:
         except TimeoutError:
             self.disconnect(threaded=True)
             print("Timed out... Closing client")
+        except Exception as ex:
+            self.disconnect(threaded=True)
+            print(f"Un handled exception: {ex}")
             
     def send(self, data, on_recieve: Callable[[Any], None] = lambda x: None):
         if not self._started_event.is_set() or self._stop_event.is_set():
@@ -310,11 +313,14 @@ class NetworkClient:
             self.client_thread.join()
         print(f"Disconnected from: {self.host}")
 
-    def is_connected(self):
+    @property
+    def connected(self):
         return not self._stop_event.is_set()
 
-    def has_started(self):
+    @property
+    def started(self):
         return self._started_event.is_set()
 
+    @property
     def time_from_last_recieve(self):
         return time.time() - self.time_on_receive

@@ -12,8 +12,11 @@ from graphics.elements import ButtonElement, SliderElement
 from menus.screen import Screen
 import pygame
 
+from models import Position
+
 
 class Menu(Screen):
+    """Rendered on top of another screen. Uses its events"""
     @classmethod
     def start(
         cls,
@@ -64,7 +67,7 @@ class OptionsMenu(Menu):
             min_value=0,
             max_value=255,
             label="RED",
-            anchor={"center": (config.SCREEN.centerx, 190)},
+            position=Position(coords=(config.SCREEN.centerx, 190)),
             label_color=pygame.Color("red"),
             default_value=current_color.r,
             on_value_changed=set_color,
@@ -85,7 +88,7 @@ class OptionsMenu(Menu):
             min_value=0,
             max_value=255,
             label="GREEN",
-            anchor={"center": (config.SCREEN.centerx, 270)},
+            position=Position(coords=(config.SCREEN.centerx, 270)),
             default_value=current_color.g,
             on_value_changed=set_color,
             id="green",
@@ -106,7 +109,7 @@ class OptionsMenu(Menu):
             min_value=0,
             max_value=255,
             label="BLUE",
-            anchor={"center": (config.SCREEN.centerx, 350)},
+            position=Position(coords=(config.SCREEN.centerx, 350)),
             default_value=current_color.b,
             on_value_changed=set_color,
             id="blue",
@@ -131,7 +134,7 @@ class OptionsMenu(Menu):
                 set_volume(GameManager.get_setting(SettingsKeys.mute_volume))
 
         volume_button = BetterButtonElement(
-            position=(50, 50),
+            position=Position(coords=(50, 50)),
             image=pygame.transform.scale(
                 config.MUTE_ICON if current_volume == 0 else config.VOLUME_ICON,
                 (30, 30),
@@ -150,7 +153,7 @@ class OptionsMenu(Menu):
             min_value=0,
             max_value=1,
             label=volume_button,
-            anchor={"center": (config.SCREEN.centerx, 470)},
+            position=Position(coords=(config.SCREEN.centerx, 470)),
             default_value=current_volume,
             on_value_changed=set_volume,
             label_position="top",
@@ -158,7 +161,7 @@ class OptionsMenu(Menu):
         )
 
         back_button = ButtonElement(
-            position=(config.SCREEN.centerx, 650),
+            position=Position(coords=(config.SCREEN.centerx, 650)),
             text_input="BACK",
             font=get_font(50),
             base_color=config.BUTTON_COLOR,
@@ -175,7 +178,7 @@ class OptionsMenu(Menu):
             outline_color=pygame.Color("black"),
             outline_width=3,
             surface=screen,
-            position=(config.SCREEN.centerx, 70),
+            position=Position(coords=(config.SCREEN.centerx, 70)),
         )
 
         elements: list[Element] = [
@@ -189,12 +192,8 @@ class OptionsMenu(Menu):
         ]
 
         pygame.mouse.set_cursor(cls._get_cursor(elements=elements))
-        cls._render_elements(screen=screen, elements=elements)
-
-        for event in events:
-            cls._check_quit(event, GameManager.quit)
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                cls._click_elements(elements=elements)
+        cls.render_elements(screen=screen, elements=elements, events=events)
+        cls.click_elements(elements=elements, events=events)
 
 
 class ConnectingMenu(Menu):
@@ -215,7 +214,7 @@ class ConnectingMenu(Menu):
             outline_color=pygame.Color("black"),
             outline_width=3,
             surface=screen,
-            position=(config.SCREEN.centerx, 300),
+            position=Position(coords=(config.SCREEN.centerx, 300)),
         )
 
         pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
@@ -239,7 +238,7 @@ class UnfocusedMenu(Menu):
             text_color=pygame.Color("white"),
             outline_color=pygame.Color("black"),
             outline_width=3,
-            position=(config.SCREEN.centerx, math.floor(config.RESOLUTION[1] / 2.5)),
+            position=Position(coords=(config.SCREEN.centerx, round(config.RESOLUTION[1] / 2.5))),
         )
 
         pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
@@ -267,7 +266,7 @@ class WaitingMenu(Menu):
             text_color=pygame.Color("white"),
             outline_color=pygame.Color("black"),
             outline_width=3,
-            position=(config.SCREEN.centerx, 200),
+            position=Position(coords=(config.SCREEN.centerx, 200)),
             surface=screen,
         )
 
@@ -277,12 +276,12 @@ class WaitingMenu(Menu):
             text_color=pygame.Color("white"),
             outline_color=pygame.Color("black"),
             outline_width=3,
-            position=(config.SCREEN.centerx, 400),
+            position=Position(coords=(config.SCREEN.centerx, 400)),
             surface=screen,
         )
 
         leave_button = BetterButtonElement(
-            position=(config.SCREEN.centerx, 650),
+            position=Position(coords=(config.SCREEN.centerx, 650)),
             text_input="LEAVE",
             font=get_font(50),
             base_color=config.BUTTON_COLOR,
@@ -290,12 +289,10 @@ class WaitingMenu(Menu):
             on_click=close,
         )
 
-        cls._render_elements(screen=screen, elements=[leave_button])
+        cls.render_elements(screen=screen, elements=[leave_button], events=events)
         pygame.mouse.set_cursor(cls._get_cursor(elements=[leave_button]))
 
-        for event in events:
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                cls._click_elements([leave_button])
+        cls.click_elements(elements=[leave_button], events=events)
 
 
 class LostConnectionMenu(Menu):
@@ -320,7 +317,7 @@ class LostConnectionMenu(Menu):
             text_color=pygame.Color("white"),
             outline_color=pygame.Color("black"),
             outline_width=3,
-            position=(config.SCREEN.centerx, 300),
+            position=Position(coords=(config.SCREEN.centerx, 300)),
             surface=screen,
         )
 
@@ -330,12 +327,12 @@ class LostConnectionMenu(Menu):
             text_color=pygame.Color("white"),
             outline_color=pygame.Color("black"),
             outline_width=3,
-            position=(config.SCREEN.centerx, 400),
+            position=Position(coords=(config.SCREEN.centerx, 400)),
             surface=screen,
         )
 
         leave_button = BetterButtonElement(
-            position=(config.SCREEN.centerx, 650),
+            position=Position(coords=(config.SCREEN.centerx, 650)),
             text_input="LEAVE",
             font=get_font(50),
             base_color=config.BUTTON_COLOR,
@@ -343,9 +340,8 @@ class LostConnectionMenu(Menu):
             on_click=close,
         )
 
-        cls._render_elements(screen=screen, elements=[leave_button])
+        cls.render_elements(screen=screen, elements=[leave_button], events=events)
         pygame.mouse.set_cursor(cls._get_cursor(elements=[leave_button]))
 
-        for event in events:
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                cls._click_elements([leave_button])
+        cls.click_elements(elements=[leave_button], events=events)
+        

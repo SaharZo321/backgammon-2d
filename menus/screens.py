@@ -13,6 +13,8 @@ from pygame.time import Clock
 import ipaddress
 import math
 
+from models import Position
+
 class LostConnection(Screen):
 
     @classmethod
@@ -24,7 +26,7 @@ class LostConnection(Screen):
             font=get_font(100),
             text_color=pygame.Color("white"),
             outline_color=pygame.Color("black"),
-            position=(config.SCREEN.centerx, 200),
+            position=Position(coords=(config.SCREEN.centerx, 200)),
         )
         
         to_the_server = OutlineText(
@@ -32,7 +34,7 @@ class LostConnection(Screen):
             font=get_font(100),
             text_color=pygame.Color("white"),
             outline_color=pygame.Color("black"),
-            position=(config.SCREEN.centerx, 300),
+            position=Position(coords=(config.SCREEN.centerx, 300)),
         )
         
 
@@ -40,8 +42,8 @@ class LostConnection(Screen):
             nonlocal run
             run = False
 
-        BACK_BUTTON = ButtonElement(
-            position=(config.SCREEN.centerx, 650),
+        back_button = ButtonElement(
+            position=Position(coords=(config.SCREEN.centerx, 650)),
             text_input="BACK",
             font=get_font(50),
             base_color=config.BUTTON_COLOR,
@@ -51,7 +53,7 @@ class LostConnection(Screen):
             on_click=back_click,
         )
 
-        buttons: list[ButtonElement] = [BACK_BUTTON]
+        buttons: list[ButtonElement] = [back_button]
 
         while run:
             GraphicsManager.render_background(screen)
@@ -60,13 +62,13 @@ class LostConnection(Screen):
             lost_connection.update(screen)
             to_the_server.update(screen)
             
-            cls._render_elements(screen=screen, elements=buttons)
+            cls.render_elements(screen=screen, elements=buttons)
             pygame.mouse.set_cursor(cls._get_cursor(elements=buttons))
             
-            for event in pygame.event.get():
-                cls._check_quit(event=event, quit=GameManager.quit)
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    cls._click_elements(elements=buttons)
+            events = pygame.event.get()
+            
+            cls.check_quit(events=events, quit=GameManager.quit)
+            cls.click_elements(elements=buttons, events=events)
 
             pygame.display.flip()
 
@@ -90,8 +92,8 @@ class JoinRoomScreen(Screen):
             GameManager.set_setting(SettingsKeys.ip, ip_address)
             back_click()
 
-        JOIN_BUTTON = BetterButtonElement(
-            position=(config.SCREEN.centerx, 500),
+        join_button = BetterButtonElement(
+            position=Position(coords=(config.SCREEN.centerx, 500)),
             text_input="JOIN",
             font=get_font(70),
             text_color=pygame.Color("black"),
@@ -101,9 +103,8 @@ class JoinRoomScreen(Screen):
             on_click=join_click,
         )
 
-        BACK_BUTTON = ButtonElement(
-            image=None,
-            position=(config.SCREEN.centerx, 650),
+        back_button = ButtonElement(
+            position=Position(coords=(config.SCREEN.centerx, 650)),
             text_input="BACK",
             font=get_font(50),
             base_color=config.BUTTON_COLOR,
@@ -119,7 +120,7 @@ class JoinRoomScreen(Screen):
         
         ip_field = TextFieldElement(
             font=get_font(60),
-            anchor={"center": (config.SCREEN.centerx, 300)},
+            position=Position(coords=(config.SCREEN.centerx, 300)),
             width=500,
             default=ip_address,
             on_value_changed=set_ip,
@@ -132,31 +133,28 @@ class JoinRoomScreen(Screen):
             font=get_font(80),
             text_color=pygame.Color("white"),
             outline_color=pygame.Color("black"),
-            position=(config.SCREEN.centerx, 100),
+            position=Position(coords=(config.SCREEN.centerx, 100)),
         )
         
-        elements: list[Element] = [BACK_BUTTON, JOIN_BUTTON, ip_field]
+        elements: list[Element] = [back_button, join_button, ip_field]
 
         while run:
 
             clock.tick(config.FRAMERATE)
 
-            JOIN_BUTTON.toggle(disabled=not cls._is_valid_ip(ip_address))
+            join_button.disabled=not cls._is_valid_ip(ip_address)
             
             GraphicsManager.render_background(screen)
             
             menu_text.update(screen)
             
             events = pygame.event.get()
+            cls.check_quit(events=events, quit=GameManager.quit)
             
-            cls._render_elements(screen=screen, elements=elements, events=events)
+            cls.render_elements(screen=screen, elements=elements, events=events)
             pygame.mouse.set_cursor(cls._get_cursor(elements=elements))
             
-            for event in events:
-                cls._check_quit(event=event, quit=GameManager.quit)
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    cls._click_elements(elements=elements)
-
+            cls.click_elements(elements=elements, events=events)
 
             pygame.display.flip()
             
@@ -186,8 +184,8 @@ class OnlineScreen(Screen):
             LocalClientGame.start(screen=screen, clock=clock)
             back_click()
 
-        JOIN_ROOM_BUTTON = BetterButtonElement(
-            position=(config.SCREEN.centerx, 270),
+        join_room_button = BetterButtonElement(
+            position=Position(coords=(config.SCREEN.centerx, 270)),
             text_input="JOIN ROOM",
             font=get_font(70),
             text_color=pygame.Color("black"),
@@ -197,8 +195,8 @@ class OnlineScreen(Screen):
             on_click=join_room_click,
         )
 
-        CREATE_ROOM_BUTTON = BetterButtonElement(
-            position=(config.SCREEN.centerx, 420),
+        create_room_button = BetterButtonElement(
+            position=Position(coords=(config.SCREEN.centerx, 420)),
             text_input="CREATE ROOM",
             font=get_font(70),
             text_color=pygame.Color("black"),
@@ -208,9 +206,8 @@ class OnlineScreen(Screen):
             on_click=create_room_click,
         )
 
-        BACK_BUTTON = ButtonElement(
-            image=None,
-            position=(config.SCREEN.centerx, 650),
+        back_button = ButtonElement(
+            position=Position(coords=(config.SCREEN.centerx, 650)),
             text_input="BACK",
             font=get_font(50),
             base_color=config.BUTTON_COLOR,
@@ -220,7 +217,7 @@ class OnlineScreen(Screen):
             on_click=back_click,
         )
 
-        buttons: list[ButtonElement] = [JOIN_ROOM_BUTTON, BACK_BUTTON, CREATE_ROOM_BUTTON]
+        buttons: list[ButtonElement] = [join_room_button, back_button, create_room_button]
 
         while run:
 
@@ -229,13 +226,14 @@ class OnlineScreen(Screen):
 
             GraphicsManager.render_background(screen)
 
-            cls._render_elements(screen=screen, elements=buttons)
+            events = pygame.event.get()
+            
+            cls.check_quit(events=events, quit=GameManager.quit)
+            
+            cls.render_elements(screen=screen, elements=buttons, events=events)
             pygame.mouse.set_cursor(cls._get_cursor(elements=buttons))
 
-            for event in pygame.event.get():
-                cls._check_quit(event=event, quit=GameManager.quit)
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    cls._click_elements(elements=buttons)
+            cls.click_elements(elements=buttons, events=events)
 
             pygame.display.flip()
 
@@ -263,9 +261,8 @@ class PlayScreen(Screen):
         def online_button_click():
             OnlineScreen.start(screen, clock)
 
-        ONLINE_BUTTON = ButtonElement(
-            image=None,
-            position=(config.SCREEN.centerx, 180),
+        online_button = ButtonElement(
+            position=Position(coords=(config.SCREEN.centerx, 180)),
             text_input="PLAY ON LAN",
             font=get_font(75),
             base_color=config.BUTTON_COLOR,
@@ -275,9 +272,8 @@ class PlayScreen(Screen):
             on_click=online_button_click,
         )
 
-        BOT_BUTTON = ButtonElement(
-            image=None,
-            position=(config.SCREEN.centerx, 330),
+        bot_button = ButtonElement(
+            position=Position(coords=(config.SCREEN.centerx, 330)),
             text_input="PLAY AGAINST BOT",
             font=get_font(75),
             base_color=config.BUTTON_COLOR,
@@ -287,9 +283,8 @@ class PlayScreen(Screen):
             on_click=bot_button_click,
         )
 
-        OFFLINE_BUTTON = ButtonElement(
-            image=None,
-            position=(config.SCREEN.centerx, 480),
+        offline_button = ButtonElement(
+            position=Position(coords=(config.SCREEN.centerx, 480)),
             text_input="PLAY 1v1",
             font=get_font(75),
             base_color=config.BUTTON_COLOR,
@@ -299,9 +294,8 @@ class PlayScreen(Screen):
             on_click=offline_button_click,
         )
 
-        BACK_BUTTON = ButtonElement(
-            image=None,
-            position=(config.SCREEN.centerx, 650),
+        back_button = ButtonElement(
+            position=Position(coords=(config.SCREEN.centerx, 650)),
             text_input="BACK",
             font=get_font(50),
             base_color=config.BUTTON_COLOR,
@@ -311,20 +305,19 @@ class PlayScreen(Screen):
             on_click=back_button_click,
         )
 
-        buttons: list[ButtonElement] = [ONLINE_BUTTON, BOT_BUTTON, OFFLINE_BUTTON, BACK_BUTTON]
+        buttons: list[ButtonElement] = [online_button, bot_button, offline_button, back_button]
 
         while run:
             screen.fill("black")
             GraphicsManager.render_background(screen=screen)
             clock.tick(config.FRAMERATE)
 
-            cls._render_elements(screen=screen, elements=buttons)
+            events = pygame.event.get()
+            cls.check_quit(events=events, quit=GameManager.quit)
+            cls.render_elements(screen=screen, elements=buttons, events=events)
             pygame.mouse.set_cursor(cls._get_cursor(elements=buttons))
 
-            for event in pygame.event.get():
-                cls._check_quit(event=event, quit=GameManager.quit)
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    cls._click_elements(elements=buttons)
+            cls.click_elements(elements=buttons, events=events)
 
             pygame.display.flip()
 
@@ -340,9 +333,11 @@ class OptionsScreen(Screen):
             run = False
         
         while run:
+            events = pygame.event.get()
+            cls.check_quit(events=events, quit=GameManager.quit)
+            
             GraphicsManager.render_background(screen=screen)
             clock.tick(config.FRAMERATE)
-            events = pygame.event.get()
             OptionsMenu.start(screen=screen, on_top=False, close=close, events=events)
             pygame.display.flip()
 
@@ -365,11 +360,11 @@ class MainScreen(Screen):
             font=get_font(100),
             text_color=pygame.Color("white"),
             outline_color=pygame.Color("black"),
-            position=(config.SCREEN.centerx, 100),
+            position=Position(coords=(config.SCREEN.centerx, 100)),
         )
 
-        PLAY_BUTTON = BetterButtonElement(
-            position=(config.SCREEN.centerx, 300),
+        play_button = BetterButtonElement(
+            position=Position(coords=(config.SCREEN.centerx, 300)),
             text_input="PLAY",
             font=get_font(75),
             base_color=config.BUTTON_COLOR,
@@ -377,8 +372,8 @@ class MainScreen(Screen):
             on_click=play_button_click,
         )
 
-        OPTIONS_BUTTON = BetterButtonElement(
-            position=(config.SCREEN.centerx, 450),
+        options_button = BetterButtonElement(
+            position=Position(coords=(config.SCREEN.centerx, 450)),
             text_input="OPTIONS",
             font=get_font(75),
             base_color=config.BUTTON_COLOR,
@@ -386,9 +381,8 @@ class MainScreen(Screen):
             on_click=options_button_click,
         )
 
-        QUIT_BUTTON = ButtonElement(
-            image=None,
-            position=(config.SCREEN.centerx, 650),
+        quit_button = ButtonElement(
+            position=Position(coords=(config.SCREEN.centerx, 650)),
             text_input="QUIT",
             font=get_font(50),
             base_color=config.BUTTON_COLOR,
@@ -396,7 +390,7 @@ class MainScreen(Screen):
             on_click=quit_button_click,
         )
 
-        buttons: list[ButtonElement] = [PLAY_BUTTON, OPTIONS_BUTTON, QUIT_BUTTON]
+        buttons: list[ButtonElement] = [play_button, options_button, quit_button]
         while True:
             clock.tick(config.FRAMERATE)
 
@@ -406,14 +400,13 @@ class MainScreen(Screen):
 
             main_menu.update(screen)
 
-            cls._render_elements(screen=screen, elements=buttons)
+            events = pygame.event.get()
+            cls.check_quit(events=events, quit=GameManager.quit)
+            
+            cls.render_elements(screen=screen, elements=buttons, events=events)
             pygame.mouse.set_cursor(cls._get_cursor(elements=buttons))
 
-            for event in pygame.event.get():
-                cls._check_quit(event=event, quit=GameManager.quit)
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    cls._click_elements(elements=buttons)
-
+            cls.click_elements(elements=buttons, events=events)
+        
             pygame.display.flip()
-
-
+            

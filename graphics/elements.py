@@ -1,72 +1,74 @@
+from abc import ABC, abstractmethod
 import math
-from typing import Callable, Literal
+import time
+from typing import Callable, Literal, Union
 import pygame
 from pygame.event import Event
 from config import get_font
 import config
 from game_manager import GameManager, SettingsKeys
 from graphics.outline_text import OutlineText
+from models import Position
 from sound_manager import SoundManager
 
+type RelativePosition = Literal["top", "bottom", "left", "right"]
 
-class Element:
+
+class Element(ABC):
     rect: pygame.Rect
     disabled: bool
+    _position: Position
+    surface: pygame.Surface
+    on_click: Callable[[], None]
 
+    @abstractmethod
     def __init__(self) -> None:
         pass
-        raise NotImplementedError()
 
+    @abstractmethod
     def render(self, surface: pygame.Surface) -> None:
         pass
-        raise NotImplementedError()
 
+    @abstractmethod
     def update(self, events: list[pygame.event.Event]) -> None:
         """
         Updates the element properties. Ususally implemented with is_input_recieved.
         """
         pass
-
-    def click(self):
-        pass
+    
+    def click(self, events: list[pygame.event.Event]) -> bool:
+        return False
 
     def is_input_recieved(self) -> bool:
         mouse_position = pygame.mouse.get_pos()
         return not self.disabled and self.rect.collidepoint(mouse_position)
 
+    @property
+    def position(self):
+        return self._position
+
+    @position.setter
+    def position(self, pos: Position):
+        self._position = pos
+        self.rect = self.surface.get_rect(**pos.dump())
+
 
 class ButtonElement(Element):
-    image: pygame.Surface
-    position: tuple[int, int]
-    disabled: bool
-    text_input: str
-
-    _font: pygame.font.Font
-    _base_color: pygame.Color
-    _hovering_color: pygame.Color
-    _text: pygame.Surface
-    _outline_size: int
-    _outline_color: pygame.Color
-    rect: pygame.Rect
-    _text_rect: pygame.Rect
-    _on_click: Callable[[], None]
-
     def __init__(
         self,
-        position: tuple[int, int],
         font: pygame.font.Font,
+        position: Position = Position(coords=(0, 0)),
         text_input: str = "",
         image: pygame.Surface | None = None,
         base_color: pygame.Color = pygame.Color("red"),
         hovering_color: pygame.Color = pygame.Color("white"),
         outline_size: int = 1,
         outline_color: pygame.Color = pygame.Color("black"),
-        on_click: Callable[[], None] = lambda: (),
+        on_click: Callable[[], None] = lambda: None,
     ) -> None:
 
         self.disabled = False
-
-        self.position = position
+        self._position = position
         self._font = font
         self._base_color = base_color
         self._hovering_color = hovering_color
@@ -74,37 +76,33 @@ class ButtonElement(Element):
         self._outline_size = outline_size
         self._outline_color = outline_color
         self._toggle_text_color(self._base_color)
-        self._text_rect = self._text.get_rect(
-            center=(self.position[0], self.position[1])
-        )
         self.image = image
-
         self.update_position(position)
-        self._on_click = on_click
+        self.on_click = on_click
+        self.surface = image if image is not None else self.surface
 
-    def update_position(self, position: tuple[int, int]):
-        if self.image is None:
-            self.rect = self._text.get_rect(center=position)
-        else:
-            self.rect = self.image.get_rect(center=position)
+    def update_position(self, position: Position):
+        self.rect = self.surface.get_rect(**position.dump())
 
-    def click(self):
-        SoundManager.play_sound(
+    def click(self, events: list[pygame.event.Event]):
+        if (
+            not any(
+                event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
+                for event in events
+            )
+            or not self.is_input_recieved()
+        ):
+            return False
+
+        SoundManager.play(
             config.BUTTON_SOUND_PATH,
             volume=GameManager.get_setting(SettingsKeys.volume),
         )
-        self._on_click()
+        self.on_click()
+        return True
 
     def render(self, screen: pygame.Surface) -> None:
-        if self.image is not None:
-            screen.blit(self.image, self.rect)
-        screen.blit(self._text, self._text_rect)
-
-    def toggle(self, disabled: bool | None = None) -> None:
-        if disabled is None:
-            self.disabled = not self.disabled
-        else:
-            self.disabled = disabled
+        screen.blit(self.surface, self.rect)
 
     def _toggle_text_color(self, color: pygame.Color):
 
@@ -112,7 +110,7 @@ class ButtonElement(Element):
         color = color if not self.disabled else disabled_color
 
         if self._outline_size > 0:
-            self._text = OutlineText.get_surface(
+            self.surface = OutlineText.get_surface(
                 text=self.text_input,
                 font=self._font,
                 text_color=color,
@@ -120,48 +118,19 @@ class ButtonElement(Element):
                 outline_width=self._outline_size,
             )
         else:
-            self._text = self._font.render(self.text_input, True, color)
+            self.surface = self._font.render(self.text_input, True, color)
 
     def update(self, events: list[pygame.event.Event]) -> None:
         color = self._hovering_color if self.is_input_recieved() else self._base_color
         if self.image is None:
             self._toggle_text_color(color)
 
-    def get_surface(self):
-        if self.image is None:
-            return self._text
-        return self.image
-
 
 class BetterButtonElement(ButtonElement):
-    image: pygame.Surface | None
-    position: tuple[int, int]
-    disabled: bool
-    text_input: str
-    text_color: pygame.Color
-    base_color: pygame.Color
-    hovering_color: pygame.Color
-    text_outline_size: int
-    text_outline_color: pygame.Color
-    rect: pygame.Rect
-    padding: int
-    _border_radius: int
-    _displayed_color: pygame.Color
-    _displayed_outline_color: pygame.Color
-    _font: pygame.font.Font
-    _text: pygame.Surface
-    _outline_size: int
-    outline_color: pygame.Color
-
-    _text_rect: pygame.Rect
-    _on_click: Callable[[], None]
-    surface: pygame.Surface
-    _surface_rect: pygame.Rect
-
     def __init__(
         self,
-        position: tuple[int, int],
-        font: pygame.font.Font = None,
+        position: Position = Position(coords=(0, 0)),
+        font: pygame.font.Font | None = None,
         text_input: str = "",
         image: pygame.Surface | None = None,
         text_color: pygame.Color = pygame.Color("black"),
@@ -173,13 +142,16 @@ class BetterButtonElement(ButtonElement):
         outline_color: pygame.Color = pygame.Color("black"),
         border_radius: int | None = None,
         padding: int = 10,
-        on_click: Callable[[], None] = lambda: (),
+        on_click: Callable[[], None] = lambda: None,
     ) -> None:
+        
+        if image is None and font is None:
+            raise Exception("Either image or font must be not None")
 
         self._border_radius = border_radius
         self.disabled = False
         self.text_color = text_color
-        self.position = position
+        self._position = position
         self.text_outline_color = text_outline_color
         self.text_outline_size = text_outline_size
         self._font = font
@@ -190,16 +162,16 @@ class BetterButtonElement(ButtonElement):
         self.outline_color = outline_color
         self.image = image
 
-        if image is None:
+        if image is None and font is not None:
             self._toggle_color(False)
-            text_rect = self._text.get_rect(center=position)
+            text_rect = self._text.get_rect(**position.dump())
             scaley = (text_rect.height + padding) / text_rect.height
             scalex = (
                 text_rect.width + padding + font.get_height() / 3
             ) / text_rect.width
             self.rect = text_rect.scale_by(scalex, scaley)
-        else:
-            image_rect = image.get_rect(center=position)
+        elif image is not None and font is None:
+            image_rect = image.get_rect(**position.dump())
             scaley = (image_rect.height + padding) / image_rect.height
             scalex = (image_rect.width + padding) / image_rect.width
             self.rect = image_rect.scale_by(scalex, scaley)
@@ -213,7 +185,7 @@ class BetterButtonElement(ButtonElement):
         else:
             self._image_rect = image.get_rect(center=self._surface_rect.center)
 
-        self._on_click = on_click
+        self.on_click = on_click
 
     def render(self, screen: pygame.Surface) -> None:
         br = (
@@ -254,7 +226,8 @@ class BetterButtonElement(ButtonElement):
         self._displayed_outline_color = (
             self.outline_color if not self.disabled else disabled_outline_color
         )
-        if self.image is not None:
+        
+        if self._font is None:
             return
 
         text_color = self.text_color if not self.disabled else disabled_text_color
@@ -277,9 +250,6 @@ class BetterButtonElement(ButtonElement):
     def update(self, events: list[pygame.event.Event]) -> None:
         self._toggle_color(self.is_input_recieved())
 
-    def get_surface(self):
-        return self.surface
-
 
 class TrackButtonElement(Element):
     rect: pygame.Rect
@@ -294,7 +264,7 @@ class TrackButtonElement(Element):
         is_top: bool,
         surface: pygame.Surface,
         surface_rect: pygame.Rect,
-        on_click: Callable[[], None] = lambda x: None,
+        on_click: Callable[[], None] = lambda: None,
     ) -> None:
         self.rect = rect
         self.is_top = is_top
@@ -334,28 +304,12 @@ class TrackButtonElement(Element):
         )
 
 
-type RelativePosition = Literal["top", "bottom", "left", "right"]
-
-
-type AnchorPosition = Literal[
-    "topleft",
-    "bottomleft",
-    "topright",
-    "bottomright",
-    "midtop",
-    "midleft",
-    "midbottom",
-    "midright",
-    "center",
-]
-
-
 class SliderElement(Element):
     def __init__(
         self,
         min_value: float,
         max_value: float,
-        anchor: dict[AnchorPosition, tuple[int, int]],
+        position: Position = Position(coords=(0, 0)),
         default_value: float | None = None,
         slider_size: tuple[int, int] = (150, 15),
         knob_size: tuple[int, int] = (10, 30),
@@ -366,7 +320,7 @@ class SliderElement(Element):
         label_position: RelativePosition = "right",
         label_padding: int = 10,
         label_color: pygame.Color = pygame.Color("white"),
-        on_value_changed: Callable[[float, str], None] = lambda x: None,
+        on_value_changed: Callable[[float, str], None] = lambda x, y: None,
         id: str = "",
     ) -> None:
         self.id: str = id
@@ -399,7 +353,7 @@ class SliderElement(Element):
             )
         elif isinstance(label, ButtonElement):
             self.label = pygame.Surface(
-                label.get_surface().get_size(), flags=pygame.SRCALPHA, depth=32
+                label.surface.get_size(), flags=pygame.SRCALPHA, depth=32
             )
             self.label.convert_alpha()
         elif type(label) is pygame.Surface:
@@ -410,11 +364,11 @@ class SliderElement(Element):
             case "left" | "right":
                 width = slider_size[0] + label_padding + label_size[0]
                 height = max(slider_size[1], label_size[1])
-                self.rect = pygame.Surface((width, height)).get_rect(**anchor)
+                self.rect = pygame.Surface((width, height)).get_rect(**position.dump())
             case "top" | "bottom":
                 width = max(slider_size[0], label_size[0])
                 height = slider_size[1] + label_padding + label_size[1]
-                self.rect = pygame.Surface((width, height)).get_rect(**anchor)
+                self.rect = pygame.Surface((width, height)).get_rect(**position.dump())
         self.label_position = label_position
         self.set_elements_position(label_position)
 
@@ -438,17 +392,21 @@ class SliderElement(Element):
         mouse_position = pygame.mouse.get_pos()
         return not self.disabled and self._slider_rect.collidepoint(mouse_position)
 
-    def click(self):
-        print("clicked")
-        SoundManager.play_sound(
+    def click(self, events: list[pygame.event.Event]):
+        if not self.is_input_recieved() or not any(
+            event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
+            for event in events
+        ):
+            return False
+
+        SoundManager.play(
             config.BUTTON_SOUND_PATH,
             volume=GameManager.get_setting(SettingsKeys.volume),
         )
-
-        if self.is_input_recieved():
-            mouse_position = pygame.mouse.get_pos()
-            value = self._position_to_value(mouse_position)
-            self.set_value(value)
+        mouse_position = pygame.mouse.get_pos()
+        value = self._position_to_value(mouse_position)
+        self.set_value(value)
+        return True
 
     def update(self, events: list[pygame.event.Event]) -> None:
         mouse_position = pygame.mouse.get_pos()
@@ -499,7 +457,7 @@ class TextFieldElement(Element):
     def __init__(
         self,
         font: pygame.font.Font,
-        anchor: dict[AnchorPosition, tuple[int, int]],
+        position: Position = Position(coords=(0, 0)),
         width: int = 0,
         default: str = "",
         disabled: bool = True,
@@ -516,7 +474,7 @@ class TextFieldElement(Element):
         )
         self.surface.convert_alpha()
         self.surface_rect = self.surface.get_rect(topleft=(0, 0))
-        self.rect = self.surface.get_rect(**anchor)
+        self.rect = self.surface.get_rect(**position.dump())
         self.max_text_rect = pygame.Surface((width, font.get_height())).get_rect(
             center=self.surface_rect.center
         )
@@ -536,26 +494,35 @@ class TextFieldElement(Element):
 
             if event.type != pygame.KEYDOWN or self.disabled:
                 continue
-            
+
             match event.key:
                 case pygame.K_BACKSPACE:
                     # get text input from 0 to -1 i.e. end.
                     self.value = self.value[:-1]
                 case pygame.K_RETURN | pygame.K_KP_ENTER:
-                    self.on_enter() 
+                    self.on_enter()
                 case pygame.K_ESCAPE:
                     self.disabled = True
                 case _:
                     # Unicode standard is used for string formation
                     self.value += event.unicode
-        
+
         self.on_value_changed(self.value)
 
-    def click(self):
-        if self.is_input_recieved():
+    def click(self, events: list[pygame.event.Event]):
+        if self.is_input_recieved() and any(
+            event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
+            for event in events
+        ):
             self.disabled = False
-        else:
+            return True
+        elif not self.is_input_recieved() and any(
+            event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
+            for event in events
+        ):
             self.disabled = True
+
+        return False
 
     def render(self, surface: pygame.Surface) -> None:
         text_to_render = self.value
@@ -591,3 +558,96 @@ class TextFieldElement(Element):
         self.surface.blit(TEXT, TEXT_RECT)
 
         surface.blit(self.surface, self.rect)
+
+
+class TimerElement(Element):
+    def __init__(
+        self,
+        font: pygame.font.Font,
+        position: Position = Position(coords=(0, 0)),
+        timer_type: Literal["sec", "min"] = "min",
+        threshold: float = 0,
+        color: pygame.Color = pygame.Color("white"),
+        threshold_color: pygame.Color = pygame.Color("red"),
+        on_done: Callable[[], None] = lambda: None,
+    ) -> None:
+        """Time in seconds"""
+        self._time = 0
+        self._type: Literal["sec", "min"] = timer_type
+        self._font = font
+        self._position = position
+        self._threshold = threshold
+        self._color = color
+        self._threshold_color = threshold_color
+        self._current_time: float = 0
+        self.on_done = on_done
+        self.surface = self._get_timer_surface(self.format_timer(0, timer_type))
+        self.rect = self.surface.get_rect(**position.dump())
+        self.disabled = True
+
+    def start(self, new_timer: float | None = None):
+        if new_timer is not None:
+            self.timer = new_timer
+        self.disabled = False
+        self._current_time = time.time()
+
+    def stop(self):
+        self.disabled = True
+
+    def update(self, events: list[Event]) -> None:
+        if self.disabled:
+            return
+
+        new_time = time.time()
+        last_timer = self.timer
+        self.timer -= new_time - self._current_time
+        self._current_time = new_time
+
+        if last_timer > self._threshold and self.timer < self._threshold:
+            SoundManager.play(
+                config.TIMER_SOUND_PATH, GameManager.get_setting(SettingsKeys.volume)
+            )
+
+        if self.timer < 0:
+            self.timer = 0
+            self.stop()
+            self.on_done()
+
+    @classmethod
+    def format_timer(cls, timer: float, type: Literal["sec", "min"]):
+        return (
+            f"{round(timer)}"
+            if type == "sec"
+            else time.strftime("%M:%S", time.gmtime(timer))
+        )
+
+    def _get_timer_surface(self, text: str):
+        return OutlineText.get_surface(
+            text=text,
+            font=self._font,
+            text_color=(
+                self._color if self.timer > self._threshold else self._threshold_color
+            ),
+            outline_color=pygame.Color("black"),
+            outline_width=math.floor(self._font.get_height() / 20),
+        )
+
+    def render(self, surface: pygame.Surface) -> None:
+        text = self.format_timer(timer=self.timer, type=self._type)
+
+        self.surface = self._get_timer_surface(text)
+
+        self.rect = self.surface.get_rect(**self._position.dump())
+
+        surface.blit(self.surface, self.rect)
+
+    @property
+    def timer(self):
+        return self._time
+
+    @timer.setter
+    def timer(self, time: float):
+        self._time = time
+        
+    def click(self, events: list[Event]) -> bool:
+        return super().click(events)

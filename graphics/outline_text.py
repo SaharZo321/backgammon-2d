@@ -1,20 +1,14 @@
 import pygame
 
+from models import Position
+
 
 class OutlineText:
     _circle_cache: dict[int, list[tuple[int, int]]] = {}
 
-    screen: pygame.Surface
-    position: tuple[int, int]
-    text: str
-    font: pygame.font.Font
-    text_color: pygame.Color
-    outline_color: pygame.Color
-    outline_width: int
-
     def __init__(
         self,
-        position: tuple[int, int],
+        position: Position,
         text: str,
         font: pygame.font.Font,
         text_color: pygame.Color = pygame.Color("black"),
@@ -79,7 +73,7 @@ class OutlineText:
     def render(
         cls,
         surface: pygame.Surface,
-        position: tuple[int, int],
+        position: Position,
         text: str,
         font: pygame.font.Font,
         text_color: pygame.Color = pygame.Color("black"),
@@ -94,14 +88,14 @@ class OutlineText:
             outline_width=outline_width,
         )
 
-        TEXT_RECT = TEXT_SURFACE.get_rect(center=position)
+        TEXT_RECT = TEXT_SURFACE.get_rect(**position.dump())
 
         surface.blit(TEXT_SURFACE, TEXT_RECT)
 
         return TEXT_RECT
 
     def update(self, surface: pygame.Surface):
-        OutlineText.render(
+        self.render(
             surface=surface,
             text=self.text,
             text_color=self.text_color,

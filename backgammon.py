@@ -1,5 +1,6 @@
 import random
 from threading import Thread
+import time
 from models import GameState, MoveType, OnlineGameState, ScoredMoves
 from models import Player
 import copy
@@ -10,22 +11,17 @@ type Dice = tuple[int, int]
 
 
 class Backgammon:
-    history: list[GameState]
+    _history: list[GameState]
 
-    
     def deepcopy(self):
-        bg = Backgammon(state_list=[state.model_copy() for state in self.history])
+        bg = Backgammon(state_list=[state.model_copy() for state in self._history])
         return bg
-    
+
     def __init__(self, state_list: list[GameState] | None = None) -> None:
         if state_list is None:
             self.new_game()
-            self.score = {
-                Player.player1: 0,
-                Player.player2: 0,
-            }
         else:
-            self.history = state_list
+            self._history = state_list
 
     def new_game(self, winner: Player | None = None):
         dice = self.roll_dice()
@@ -58,7 +54,7 @@ class Backgammon:
             moves_left=moves_left,
             score=score,
         )
-        self.history = [new_state]
+        self._history = [new_state]
 
     def create_board(self) -> None:
         # Initialize board with pieces in starting positions
@@ -85,50 +81,41 @@ class Backgammon:
         board[23] = 1
         return board
 
-    def get_board(self):
-        return self.history[-1].board
+    @property
+    def board(self):
+        return self._history[-1].board
 
-    def set_board(self, board):
-        self.history[-1].board = board
+    @property
+    def bar(self):
+        return self._history[-1].bar
 
-    def get_bar(self):
-        return self.history[-1].bar
+    @property
+    def home(self):
+        return self._history[-1].home
 
-    def set_bar(self, bar: dict[Player, int]):
-        self.history[-1].bar = bar
+    @property
+    def dice(self):
+        return self._history[-1].dice
 
-    def get_home(self):
-        return self.history[-1].home
+    @property
+    def moves_left(self):
+        return self._history[-1].moves_left
 
-    def set_home(self, home: dict[Player, int]):
-        self.history[-1].home = home
+    @property
+    def score(self):
+        return self._history[-1].score
 
-    def get_dice(self):
-        return self.history[-1].dice
+    @property
+    def current_turn(self):
+        return self._history[-1].current_turn
 
-    def set_dice(self, dice: tuple[int, int]):
-        self.history[-1].dice = dice
+    @property
+    def state(self):
+        return self._history[-1].model_copy(deep=True)
 
-    def get_moves_left(self):
-        return self.history[-1].moves_left
-
-    def set_moves_left(self, moves_left: list[int]):
-        self.history[-1].moves_left = moves_left
-
-    def get_score(self):
-        return self.history[-1].score
-
-    def set_score(self, score: dict[Player, int]):
-        self.history[-1].score = score
-
-    def get_current_turn(self):
-        return self.history[-1].current_turn
-
-    def set_current_turn(self, current_turn: Player):
-        self.history[-1].current_turn = current_turn
-
-    def get_state(self):
-        return self.history[-1].model_copy(deep=True)
+    @property
+    def history(self):
+        return self._history[:-1]
 
     @classmethod
     def get_piece_type(cls, player: Player):
@@ -140,27 +127,29 @@ class Backgammon:
         )  # 1 for player1, -1 for player2
 
     def save_state(self, state: GameState) -> None:
-        self.history.append(state)
+        self._history.append(state)
 
     def undo(self):
-        if len(self.history) > 1:
-            self.history.pop()
+        if len(self._history) > 1:
+            self._history.pop()
             return True
         return False
 
-    def roll_dice(self) -> Dice:
+    @staticmethod
+    def roll_dice() -> Dice:
         dice = (random.randint(1, 6), random.randint(1, 6))
         return dice
 
-    def get_moves_from_dice(self, dice: tuple[int, int]):
+    @staticmethod
+    def get_moves_from_dice(dice: tuple[int, int]):
         if dice[0] == dice[1]:  # Double roll
             return [dice[0]] * 4
         return [dice[0], dice[1]]
 
     def is_valid_move(self, start: int, end: int) -> bool:
-        piece_type = self.get_piece_type(self.get_current_turn())
+        piece_type = self.get_piece_type(self.current_turn)
         board_range = range(24)
-        board = self.get_board()
+        board = self.board
         if start not in board_range or end not in board_range:
             return False
         if (start - end) * piece_type > 0:
@@ -170,7 +159,7 @@ class Backgammon:
         if board[end] * piece_type < -1:
             return False
         die = abs(end - start)
-        if die not in self.get_moves_left():
+        if die not in self.moves_left:
             return False
         return True
 
@@ -178,7 +167,7 @@ class Backgammon:
         if not self.is_valid_move(start, end):
             return False
 
-        new_state = self.get_state()  # Save state before making a move
+        new_state = self.state  # Save state before making a move
         piece_type = self.get_piece_type(new_state.current_turn)
         new_state.board[start] -= piece_type
 
@@ -195,20 +184,20 @@ class Backgammon:
         return True
 
     def get_start_position(self) -> int:
-        return -1 if self.get_current_turn() == Player.player1 else 24
+        return -1 if self.current_turn == Player.player1 else 24
 
     def can_leave_bar(self, end: int) -> bool:
-        piece_type = self.get_piece_type(self.get_current_turn())
-        return self.get_board()[end] * piece_type > -2
+        piece_type = self.get_piece_type(self.current_turn)
+        return self.board[end] * piece_type > -2
 
     def leave_bar(self, end: int) -> bool:
         if not self.can_leave_bar(end):
             return False
 
-        new_state = self.get_state()
+        new_state = self.state
         piece_type = self.get_piece_type(new_state.current_turn)
 
-        new_state.bar[self.get_current_turn()] -= 1
+        new_state.bar[self.current_turn] -= 1
 
         if new_state.board[end] * piece_type == -1:  # Hit opponent's single piece
             new_state.board[end] = piece_type
@@ -230,8 +219,8 @@ class Backgammon:
 
         start = self.get_start_position()
 
-        for die in self.get_moves_left():
-            target_position = start + die * self.get_piece_type(self.get_current_turn())
+        for die in self.moves_left:
+            target_position = start + die * self.get_piece_type(self.current_turn)
             if target_position not in positions and self.can_leave_bar(target_position):
                 positions.append(target_position)
 
@@ -239,36 +228,34 @@ class Backgammon:
 
     def switch_turn(self) -> Dice:
         print("switched turn")
-        self.history = [self.history[-1]]
-        self.set_current_turn(Player.other(self.get_current_turn()))
-        dice = self.roll_dice()
-        self.set_dice(dice)
-        self.set_moves_left(self.get_moves_from_dice(dice))
+        self._history = [self._history[-1]]
+        state = self._history[0]
+        state.current_turn = (Player.other(self.current_turn))
+        state.dice = self.roll_dice()
+        state.moves_left = self.get_moves_from_dice(self.state.dice)
 
     def is_bearing_off(self) -> bool:
-        home_range = self.get_home_range(self.get_current_turn())
-        piece_type = self.get_piece_type(self.get_current_turn())
+        home_range = self.get_home_range(self.current_turn)
+        piece_type = self.get_piece_type(self.current_turn)
         return not any(
             (pieces * piece_type > 0 and position not in home_range)
-            for position, pieces in enumerate(self.get_board())
+            for position, pieces in enumerate(self.board)
         )
 
     def can_bear_off(self, position: int, die: int) -> bool:
-        home_range = self.get_home_range(self.get_current_turn())
+        home_range = self.get_home_range(self.current_turn)
         if not ((position in home_range) and self.is_bearing_off()):
             return False
 
-        piece_type = self.get_piece_type(self.get_current_turn())
+        piece_type = self.get_piece_type(self.current_turn)
         occupied_positions = [
-            position
-            for position in home_range
-            if self.get_board()[position] * piece_type > 0
+            position for position in home_range if self.board[position] * piece_type > 0
         ]
         if len(occupied_positions) == 0:
             return False
 
         die_to_bear_off = (
-            24 - position if Player.player1 == self.get_current_turn() else position + 1
+            24 - position if Player.player1 == self.current_turn else position + 1
         )
         if die_to_bear_off == die:
             return True
@@ -277,7 +264,7 @@ class Backgammon:
 
         farthest_position = (
             max(occupied_positions)
-            if self.get_current_turn() == Player.player2
+            if self.current_turn == Player.player2
             else min(occupied_positions)
         )
 
@@ -288,10 +275,10 @@ class Backgammon:
 
     def bear_off(self, start: int) -> bool:
 
-        if not any(self.can_bear_off(start, die) for die in self.get_moves_left()):
+        if not any(self.can_bear_off(start, die) for die in self.moves_left):
             return False
 
-        new_state = self.get_state()
+        new_state = self.state
 
         min_die = 24 - start if Player.player1 == new_state.current_turn else start + 1
 
@@ -300,42 +287,43 @@ class Backgammon:
         die_to_remove = min(higher_dice)
         new_state.moves_left.remove(die_to_remove)
 
-        new_state.board[start] -= 1 if self.get_current_turn() == Player.player1 else -1
-        new_state.home[self.get_current_turn()] += 1
+        new_state.board[start] -= 1 if self.current_turn == Player.player1 else -1
+        new_state.home[self.current_turn] += 1
 
         self.save_state(new_state)
         return True
 
     def is_game_over(self) -> bool:
-        return self.get_winner() is not None
+        return self.winner is not None
 
-    def get_winner(self) -> Player | None:
-        if self.get_home()[Player.player2] == 15:
+    @property
+    def winner(self) -> Player | None:
+        if self.home[Player.player2] == 15:
             return Player.player2
-        elif self.get_home()[Player.player1] == 15:
+        elif self.home[Player.player1] == 15:
             return Player.player1
         return None
 
     def get_winning_score(self, winner: Player):
         loser = Player.other(player=winner)
-        current_score: dict[Player, int] = self.get_score()
-        if self.get_bar()[loser] > 0 or any(
-            self.get_board()[index] * self.get_piece_type(loser) > 0
+        current_score: dict[Player, int] = self.score
+        if self.bar[loser] > 0 or any(
+            self.board[index] * self.get_piece_type(loser) > 0
             for index in self.get_home_range(winner)
         ):
             current_score[winner] += 3
-        elif self.get_home()[loser] > 0:
+        elif self.home[loser] > 0:
             current_score[winner] += 1
         else:
             current_score[winner] += 2
         return current_score
 
     def get_movable_pieces(self) -> list[int]:
-        if self.get_bar()[self.get_current_turn()] > 0:
+        if self.bar[self.current_turn] > 0:
             return []
         placements: list[int] = []
-        piece_type = self.get_piece_type(self.get_current_turn())
-        for position, placement in enumerate(self.get_board()):
+        piece_type = self.get_piece_type(self.current_turn)
+        for position, placement in enumerate(self.board):
             if (
                 placement * piece_type > 0
                 and len(self.get_possible_tracks(position)) > 0
@@ -347,8 +335,7 @@ class Backgammon:
 
         return (
             start in range(0, 24)
-            and self.get_board()[start] * self.get_piece_type(self.get_current_turn())
-            > 0
+            and self.board[start] * self.get_piece_type(self.current_turn) > 0
         )
 
     def get_possible_tracks(self, start: int) -> list[int]:
@@ -357,8 +344,8 @@ class Backgammon:
 
         possible_tracks: list[int] = []
 
-        piece_type = self.get_piece_type(self.get_current_turn())
-        for die in self.get_moves_left():
+        piece_type = self.get_piece_type(self.current_turn)
+        for die in self.moves_left:
             end = start + die * piece_type
             if (
                 self.is_valid_move(start, end) or self.can_bear_off(start, die)
@@ -367,7 +354,7 @@ class Backgammon:
         return possible_tracks
 
     def is_turn_done(self) -> bool:
-        if len(self.get_moves_left()) == 0:
+        if len(self.moves_left) == 0:
             return True
         if (
             len(self.get_movable_pieces()) == 0
@@ -380,10 +367,10 @@ class Backgammon:
         return range(0, 6) if player == Player.player2 else range(18, 24)
 
     def get_captured_pieces(self) -> int:
-        return self.get_bar()[self.get_current_turn()]
+        return self.bar[self.current_turn]
 
     def has_history(self) -> bool:
-        return len(self.history) > 1
+        return len(self._history) > 1
 
     def handle_move(self, move: Move):
         match move.move_type:
@@ -407,39 +394,44 @@ class OnlineBackgammon:
 
     def __init__(self, online_color: Color, local_color: Color) -> None:
         self.game = Backgammon()
-        self.started = False
+        self.time_on_switch_turn = 0
         self.is_player2_connected = False
         self.online_color = online_color
         self.local_color = local_color
-
+    
     def new_game(self) -> None:
-        winner = self.game.get_winner()
-        self.game.new_game(winner=winner)
+        self.game.new_game(winner=self.game.winner)
 
     def manipulate_board(self) -> OnlineGameState:
-        board = self.game.get_board()
+        board = self.game.board
         new_board = [0] * len(board)
 
         for index, track in enumerate(board):
             oposite_index = len(board) - index - 1
             new_board[oposite_index] = track * -1
 
-        bar = self.game.get_bar()
+        bar = self.game.bar
         new_bar = {
             Player.player1: bar[Player.player2],
             Player.player2: bar[Player.player1],
         }
 
-        home = self.game.get_home()
+        home = self.game.home
         new_home = {
             Player.player1: home[Player.player2],
             Player.player2: home[Player.player1],
         }
 
-        current_turn = self.game.get_current_turn()
+        score = self.game.score
+        new_score = {
+            Player.player1: score[Player.player2],
+            Player.player2: score[Player.player1],
+        }
+        current_turn = self.game.current_turn
         new_current_turn = Player.other(current_turn)
 
-        state = self.game.get_state()
+        state = self.game.state
+        state.score = new_score
         state.board = new_board
         state.bar = new_bar
         state.home = new_home
@@ -448,7 +440,7 @@ class OnlineBackgammon:
         return self.get_online_game_state(state)
 
     def manipulate_move(self, move: Move) -> Move:
-        board_length = len(self.game.get_board())
+        board_length = len(self.game.board)
         return Move(
             move_type=move.move_type,
             start=board_length - move.start - 1,
@@ -457,12 +449,12 @@ class OnlineBackgammon:
 
     def get_online_game_state(self, state: GameState | None = None) -> OnlineGameState:
         if state is None:
-            state = self.game.get_state()
+            state = self.game.state
 
         return state.to_online_game_state(
             online_color=self.online_color,
             local_color=self.local_color,
-            history_length=len(self.game.history) - 1
+            history_length=len(self.game.history),
         )
 
 
@@ -582,11 +574,11 @@ class BackgammonAI:
     @classmethod
     def _threaded_get_best_move(cls, game: Backgammon) -> ScoredMoves:
 
-        number_of_moves = len(game.get_moves_left())
+        number_of_moves = len(game.moves_left)
 
         if number_of_moves == 0:
             return ScoredMoves(
-                score=cls._evaluate_game_state(game.get_state()),
+                score=cls._evaluate_game_state(game.state),
                 moves=[],
             )
 
@@ -611,9 +603,7 @@ class BackgammonAI:
 
         current_possible_moves = cls._get_all_possible_moves(game)
         if len(current_possible_moves) == 0:
-            return ScoredMoves(
-                score=cls._evaluate_game_state(game.get_state()), moves=[]
-            )
+            return ScoredMoves(score=cls._evaluate_game_state(game.state), moves=[])
 
         best_scored_moves = ScoredMoves(moves=[], score=-1000)
 
@@ -645,9 +635,9 @@ class BackgammonAI:
 
         game_copy = game.deepcopy()
 
-        def get_best_move():
+        def get_move():
             moves = cls._threaded_get_best_move(game_copy)
             callback(moves)
 
-        thread = Thread(target=get_best_move)
+        thread = Thread(target=get_move)
         thread.start()

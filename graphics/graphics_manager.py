@@ -5,7 +5,7 @@ import math
 import config
 from config import get_font
 from graphics.elements import TrackButtonElement
-from models import Player
+from models import Player, Position
 from models import GameState
 from graphics.outline_text import OutlineText
 
@@ -283,61 +283,59 @@ class GraphicsManager:
         text = "Player1" if current_turn == Player.player1 else "Player2"
         if is_online:
             text = "YOU" if current_turn == Player.player1 else "OPPONENT"
-        TURN_TEXT = OutlineText.get_surface(
+        OutlineText.render(
+            position=Position(coords=(math.floor(self.RECT.left / 2), 130)),
             text=text,
             font=get_font(30),
             text_color=pygame.Color("white"),
             outline_color=pygame.Color("black"),
+            surface=self.screen,
         )
-        turn_center = (math.floor(self.RECT.left / 2), 130)
-        TURN_TEXT_RECT = TURN_TEXT.get_rect(center=turn_center)
-        self.screen.blit(TURN_TEXT, TURN_TEXT_RECT)
 
     def render_dice(self, dice: tuple[int, int]):
-        DICE_TEXT = OutlineText.get_surface(
+        OutlineText.render(
             text=str(dice[0]) + " " + str(dice[1]),
             font=get_font(70),
             text_color=pygame.Color("white"),
             outline_color=pygame.Color("black"),
+            position=Position(
+                coords=(
+                    math.floor((self.RECT.right + self.screen.get_width()) / 2),
+                    560,
+                )
+            ),
+            surface=self.screen,
         )
-        buttons_center = (
-            math.floor((self.RECT.right + self.screen.get_width()) / 2),
-            560,
-        )
-        DICE_TEXT_RECT = DICE_TEXT.get_rect(center=buttons_center)
-        self.screen.blit(DICE_TEXT, DICE_TEXT_RECT)
 
     def render_score(
         self, score: dict[Player, int], player_colors: dict[Player, pygame.Color]
     ):
-        COLON_SCORE_TEXT = OutlineText.get_surface(
+        COLON_SCORE_TEXT_RECT = OutlineText.render(
             text=":",
             font=get_font(70),
             text_color=pygame.Color("white"),
             outline_color=pygame.Color("black"),
+            position=Position(coords=(math.floor(self.RECT.left / 2), 60)),
+            surface=self.screen,
         )
-        score_center = math.floor(self.RECT.left / 2), 60
-        COLON_SCORE_TEXT_RECT = COLON_SCORE_TEXT.get_rect(center=score_center)
-        self.screen.blit(COLON_SCORE_TEXT, COLON_SCORE_TEXT_RECT)
-        PLAYER1_SCORE_TEXT = OutlineText.get_surface(
+        
+        OutlineText.render(
             text=str(score[Player.player1]),
             font=get_font(70),
             text_color=player_colors[Player.player1],
             outline_color=pygame.Color("black"),
+            position=Position(anchor="midleft", coords=(math.floor(COLON_SCORE_TEXT_RECT.right + 10), 60)),
+            surface=self.screen,
         )
-        player1_midleft = math.floor(COLON_SCORE_TEXT_RECT.right + 10), 60
-        PLAYER1_SCORE_TEXT_RECT = PLAYER1_SCORE_TEXT.get_rect(midleft=player1_midleft)
-        self.screen.blit(PLAYER1_SCORE_TEXT, PLAYER1_SCORE_TEXT_RECT)
 
-        PLAYER2_SCORE_TEXT = OutlineText.get_surface(
+        OutlineText.render(
+            position=Position(anchor="midright", coords=(math.floor(COLON_SCORE_TEXT_RECT.left - 10), 60)),
+            surface=self.screen,
             text=str(score[Player.player2]),
             font=get_font(70),
             text_color=player_colors[Player.player2],
             outline_color=pygame.Color("black"),
         )
-        player2_midright = math.floor(COLON_SCORE_TEXT_RECT.left - 10), 60
-        PLAYER2_SCORE_TEXT_RECT = PLAYER2_SCORE_TEXT.get_rect(midright=player2_midright)
-        self.screen.blit(PLAYER2_SCORE_TEXT, PLAYER2_SCORE_TEXT_RECT)
 
     def render_tracks(self) -> None:
         for index, rect in enumerate(self.top_tracks_rect):
@@ -495,14 +493,18 @@ class ColorConverter:
         rgb = pygame_color.r, pygame_color.g, pygame_color.b
         return PydanticColor(value=rgb)
 
-def gradient_surface(left_colour: pygame.Color, right_colour: pygame.Color, size: tuple[int,int]):
-    """ Draw a horizontal-gradient filled rectangle covering <target_rect> """
-    surface = pygame.Surface( ( 2, 2 ) )                                   # tiny! 2x2 bitmap
-    pygame.draw.line( surface, left_colour,  ( 0,0 ), ( 0,1 ) )            # left colour line
-    pygame.draw.line( surface, right_colour, ( 1,0 ), ( 1,1 ) )            # right colour line
+
+def gradient_surface(
+    left_colour: pygame.Color, right_colour: pygame.Color, size: tuple[int, int]
+):
+    """Draw a horizontal-gradient filled rectangle covering <target_rect>"""
+    surface = pygame.Surface((2, 2))  # tiny! 2x2 bitmap
+    pygame.draw.line(surface, left_colour, (0, 0), (0, 1))  # left colour line
+    pygame.draw.line(surface, right_colour, (1, 0), (1, 1))  # right colour line
     surface = pygame.transform.smoothscale(surface, size)  # stretch!
     return surface
 
+
 def draw_border(surface: pygame.Surface, width: int, color: pygame.Color):
-    pygame.draw.rect(surface, color, (0,0) + surface.get_size(), width)
+    pygame.draw.rect(surface, color, (0, 0) + surface.get_size(), width)
     return surface
