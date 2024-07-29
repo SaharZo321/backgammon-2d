@@ -409,10 +409,19 @@ class SliderElement(Element):
         return True
 
     def update(self, events: list[pygame.event.Event]) -> None:
+        if not self.is_input_recieved():
+            return
+        
         mouse_position = pygame.mouse.get_pos()
-        if pygame.mouse.get_pressed()[0] and self.is_input_recieved():
+        if pygame.mouse.get_pressed()[0]:
             value = self._position_to_value(mouse_position)
             self.set_value(value)
+            return
+        
+        mwevents = [event for event in events if event.type == pygame.MOUSEWHEEL]
+        for event in mwevents:
+            self.set_value(value = self.value + (self.max - self.min) * event.y / 100)
+            return
 
     def _value_to_position(self, value: float):
         ratio = value / self.max
