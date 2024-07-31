@@ -1,8 +1,8 @@
 from enum import StrEnum, auto
 from typing import Literal
-from pydantic import BaseModel, Field
-
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
 from pydantic_extra_types.color import Color as PydanticColor
+import pygame
 
 
 class Address(BaseModel):
@@ -91,7 +91,35 @@ class Position(BaseModel):
         "midright",
         "center",
     ] = Field(default="center")
-    coords: tuple[int, int]
+    coords: tuple[int, int] = Field(default=(0, 0))
 
     def dump(self):
         return {self.anchor: self.coords}
+
+
+class Options(BaseModel):
+    ip: str
+    opponent_color: PydanticColor
+    piece_color: PydanticColor
+    volume: float
+    mute_volume: float
+
+    @field_validator("volume", "mute_volume")
+    @classmethod
+    def check_volume(cls, value: float, info: ValidationInfo):
+        if isinstance(value, float):
+            between_zero_and_one = 0 <= value <= 1
+            assert between_zero_and_one, f"{info.field_name} must be between 0 and 1"
+        return value
+
+
+class ColorConverter:
+    @staticmethod
+    def pydantic_to_pygame(pydantic_color: PydanticColor) -> pygame.Color:
+        rgb = pydantic_color.as_rgb_tuple()
+        return pygame.Color(*rgb)
+
+    @staticmethod
+    def pygame_to_pydantic(pygame_color: pygame.Color) -> PydanticColor:
+        rgb = pygame_color.r, pygame_color.g, pygame_color.b
+        return PydanticColor(value=rgb)

@@ -1,15 +1,12 @@
 from abc import ABC, abstractmethod
 import math
 import time
-from typing import Callable, Literal, Union
+from typing import Callable, Literal
 import pygame
 from pygame.event import Event
 from config import get_font
-import config
-from game_manager import GameManager, SettingsKeys
 from graphics.outline_text import OutlineText
 from models import Position
-from sound_manager import SoundManager
 
 type RelativePosition = Literal["top", "bottom", "left", "right"]
 
@@ -35,7 +32,7 @@ class Element(ABC):
         Updates the element properties. Ususally implemented with is_input_recieved.
         """
         pass
-    
+
     def click(self, events: list[pygame.event.Event]) -> bool:
         return False
 
@@ -56,33 +53,35 @@ class Element(ABC):
 class ButtonElement(Element):
     def __init__(
         self,
-        font: pygame.font.Font,
+        font: pygame.font.Font | None = None,
         position: Position = Position(coords=(0, 0)),
-        text_input: str = "",
+        text_input: str = "BUTTON",
         image: pygame.Surface | None = None,
         base_color: pygame.Color = pygame.Color("red"),
         hovering_color: pygame.Color = pygame.Color("white"),
-        outline_size: int = 1,
+        outline_size: int = 2,
         outline_color: pygame.Color = pygame.Color("black"),
         on_click: Callable[[], None] = lambda: None,
+        sound: pygame.mixer.Sound | None = None,
     ) -> None:
 
+        if image is None and font is None:
+            raise Exception("Either image or font must be not None")
+
         self.disabled = False
-        self._position = position
         self._font = font
         self._base_color = base_color
         self._hovering_color = hovering_color
         self.text_input = text_input
         self._outline_size = outline_size
         self._outline_color = outline_color
-        self._toggle_text_color(self._base_color)
+        if font is not None:
+            self._toggle_text_color(self._base_color)
         self.image = image
-        self.update_position(position)
-        self.on_click = on_click
         self.surface = image if image is not None else self.surface
-
-    def update_position(self, position: Position):
-        self.rect = self.surface.get_rect(**position.dump())
+        self.position = position
+        self.on_click = on_click
+        self.sound = sound
 
     def click(self, events: list[pygame.event.Event]):
         if (
@@ -94,10 +93,8 @@ class ButtonElement(Element):
         ):
             return False
 
-        SoundManager.play(
-            config.BUTTON_SOUND_PATH,
-            volume=GameManager.get_setting(SettingsKeys.volume),
-        )
+        if self.sound:
+            self.sound.play()
         self.on_click()
         return True
 
@@ -122,7 +119,7 @@ class ButtonElement(Element):
 
     def update(self, events: list[pygame.event.Event]) -> None:
         color = self._hovering_color if self.is_input_recieved() else self._base_color
-        if self.image is None:
+        if self._font is not None:
             self._toggle_text_color(color)
 
 
@@ -131,7 +128,7 @@ class BetterButtonElement(ButtonElement):
         self,
         position: Position = Position(coords=(0, 0)),
         font: pygame.font.Font | None = None,
-        text_input: str = "",
+        text_input: str = "BUTTON",
         image: pygame.Surface | None = None,
         text_color: pygame.Color = pygame.Color("black"),
         text_outline_size: int = 0,
@@ -143,15 +140,15 @@ class BetterButtonElement(ButtonElement):
         border_radius: int | None = None,
         padding: int = 10,
         on_click: Callable[[], None] = lambda: None,
+        sound: pygame.mixer.Sound | None = None,
     ) -> None:
-        
+
         if image is None and font is None:
             raise Exception("Either image or font must be not None")
 
         self._border_radius = border_radius
         self.disabled = False
         self.text_color = text_color
-        self._position = position
         self.text_outline_color = text_outline_color
         self.text_outline_size = text_outline_size
         self._font = font
@@ -161,23 +158,23 @@ class BetterButtonElement(ButtonElement):
         self._outline_size = outline_size
         self.outline_color = outline_color
         self.image = image
+        self.sound = sound
 
-        if image is None and font is not None:
+        if image is None:
             self._toggle_color(False)
-            text_rect = self._text.get_rect(**position.dump())
-            scaley = (text_rect.height + padding) / text_rect.height
-            scalex = (
-                text_rect.width + padding + font.get_height() / 3
-            ) / text_rect.width
-            self.rect = text_rect.scale_by(scalex, scaley)
-        elif image is not None and font is None:
-            image_rect = image.get_rect(**position.dump())
-            scaley = (image_rect.height + padding) / image_rect.height
-            scalex = (image_rect.width + padding) / image_rect.width
-            self.rect = image_rect.scale_by(scalex, scaley)
+            text_rect = self._text.get_rect(center=(0, 0))
+            size = (
+                (text_rect.width + padding + font.get_height() / 3),
+                text_rect.height + padding,
+            )
+            self.surface = pygame.Surface(size, flags=pygame.SRCALPHA, depth=32)
+        else:
+            image_rect = image.get_rect(center=(0, 0))
+            size = (image_rect.width + padding), (image_rect.height + padding)
+            self.surface = pygame.Surface(size, flags=pygame.SRCALPHA, depth=32)
 
-        self.surface = pygame.Surface(self.rect.size, flags=pygame.SRCALPHA, depth=32)
         self.surface.convert_alpha()
+        self.position = position
         self._surface_rect = self.surface.get_rect(topleft=(0, 0))
 
         if image is None:
@@ -226,7 +223,7 @@ class BetterButtonElement(ButtonElement):
         self._displayed_outline_color = (
             self.outline_color if not self.disabled else disabled_outline_color
         )
-        
+
         if self._font is None:
             return
 
@@ -236,7 +233,7 @@ class BetterButtonElement(ButtonElement):
             if not self.disabled
             else disabled_text_outline_color
         )
-        if self._outline_size > 0:
+        if self.text_outline_size > 0:
             self._text = OutlineText.get_surface(
                 text=self.text_input,
                 font=self._font,
@@ -294,6 +291,9 @@ class TrackButtonElement(Element):
                 border_radius=2,
             )
 
+    def update(self, events: list[Event]) -> None:
+        return super().update(events)
+
     def is_input_recieved(self) -> bool:
         mouse_position = pygame.mouse.get_pos()
 
@@ -322,20 +322,26 @@ class SliderElement(Element):
         label_color: pygame.Color = pygame.Color("white"),
         on_value_changed: Callable[[float, str], None] = lambda x, y: None,
         id: str = "",
+        show_value: bool = False,
+        step: float = 0,
+        sound: pygame.mixer.Sound | None = None,
     ) -> None:
+        self.step = step
         self.id: str = id
-        self.on_value_changed: Callable[[float, str], None] = on_value_changed
+        self.on_value_change: Callable[[float, str], None] = on_value_changed
         self.min: float = min_value
         self.max: float = max_value
-
-        self.value: float = default_value if default_value is not None else min_value
-        self.knob_size: tuple[int, int] = knob_size
+        self.sound = sound
+        self._value: float = default_value if default_value is not None else min_value
+        self.knob_size = knob_size
         self.slider_height = max(knob_size[1], slider_size[1])
         self.knob_color = knob_color
         self.slider_size = slider_size
         self.disabled = False
-
+        self.show_value = show_value
         self.label_padding = label_padding
+        self.drag = False
+        self.time_hovering = 0
 
         if type(slider_surface) is pygame.Surface:
             self.slider_surface = pygame.transform.scale(slider_surface, slider_size)
@@ -378,12 +384,13 @@ class SliderElement(Element):
         self.slider_color = slider_color
 
     def render(self, surface: pygame.Surface) -> None:
-        surface.blit(self.label, self._label_rect)
+        if self.show_value:
+            self._render_value()
         surface.blit(self.slider_surface, self._slider_rect)
         surface.blit(self.label, self._label_rect)
         # render knob based on value
         knob_surface = pygame.Surface(size=self.knob_size)
-        knob_center = self._value_to_position(self.value)
+        knob_center = self._value_to_position(self._value)
         knob_rect = knob_surface.get_rect(center=knob_center)
         pygame.draw.rect(surface, self.knob_color, knob_rect)
         pygame.draw.rect(surface, pygame.Color("black"), knob_rect, width=2)
@@ -399,43 +406,69 @@ class SliderElement(Element):
         ):
             return False
 
-        SoundManager.play(
-            config.BUTTON_SOUND_PATH,
-            volume=GameManager.get_setting(SettingsKeys.volume),
-        )
+        if self.sound:
+            self.sound.play()
         mouse_position = pygame.mouse.get_pos()
-        value = self._position_to_value(mouse_position)
-        self.set_value(value)
+        self.value = self._position_to_value(mouse_position)
+        self.drag = True
         return True
 
     def update(self, events: list[pygame.event.Event]) -> None:
         if not self.is_input_recieved():
-            return
-        
-        mouse_position = pygame.mouse.get_pos()
-        if pygame.mouse.get_pressed()[0]:
-            value = self._position_to_value(mouse_position)
-            self.set_value(value)
-            return
-        
-        mwevents = [event for event in events if event.type == pygame.MOUSEWHEEL]
-        for event in mwevents:
-            self.set_value(value = self.value + (self.max - self.min) * event.y / 100)
+            if any(event.type == pygame.MOUSEBUTTONUP for event in events):
+                self.drag = False
             return
 
+        if (
+            pygame.mouse.get_pressed()[0]
+            and self.drag
+            and any(event.type == pygame.MOUSEMOTION for event in events)
+        ):
+            mouse_position = pygame.mouse.get_pos()
+            self.value = self._position_to_value(mouse_position)
+            return
+
+        mwevents = [event for event in events if event.type == pygame.MOUSEWHEEL]
+        for event in mwevents:
+            self.value = (
+                self.value
+                + (self.step if self.step else ((self.max - self.min) / 100)) * event.y
+            )
+
+    def render_tooltip(self):
+        pass
+
     def _value_to_position(self, value: float):
-        ratio = value / self.max
+        ratio = (value - self.min) / (self.max - self.min)
         centerx = ratio * self._slider_rect.width + self._slider_rect.left
         return (centerx, self._slider_rect.centery)
 
     def _position_to_value(self, mouse_position: tuple[int, int]):
         ratio = (mouse_position[0] - self._slider_rect.left) / self._slider_rect.width
-        return ratio * self.max
+        return ratio * (self.max - self.min) + self.min
 
-    def set_value(self, value: float):
-        value = max(value, self.min) if value < self.min else min(value, self.max)
-        self.on_value_changed(value, self.id)
-        self.value = value
+    def _render_value(self):
+        value_surface = get_font(self.slider_size[1] - 3).render(
+            f"{round(self.value)}", True, "white"
+        )
+        value_rect = value_surface.get_rect(topleft=(4, 0))
+        self.slider_surface.blit(value_surface, value_rect)
+
+    @property
+    def value(self):
+        return self._value
+
+    @value.setter
+    def value(self, new_value: float):
+        new_value = (
+            max(new_value, self.min)
+            if new_value < self.min
+            else min(new_value, self.max)
+        )
+        if self.step:
+            new_value = round(new_value / self.step) * self.step
+        self.on_value_change(new_value, self.id)
+        self._value = new_value
 
     def set_elements_position(self, position: RelativePosition):
 
@@ -473,7 +506,9 @@ class TextFieldElement(Element):
         text_align: Literal["right", "left", "center"] = "left",
         on_enter: Callable[[], None] = lambda: None,
         on_value_changed: Callable[[str], None] = lambda x: None,
+        sound: pygame.mixer.Sound | None = None,
     ) -> None:
+        self.sound = sound
         self.font = font
         self.width = width
         self.disabled = disabled
@@ -523,6 +558,8 @@ class TextFieldElement(Element):
             event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
             for event in events
         ):
+            if self.sound:
+                self.sound.play()
             self.disabled = False
             return True
         elif not self.is_input_recieved() and any(
@@ -579,6 +616,7 @@ class TimerElement(Element):
         color: pygame.Color = pygame.Color("white"),
         threshold_color: pygame.Color = pygame.Color("red"),
         on_done: Callable[[], None] = lambda: None,
+        threshold_sound: pygame.mixer.Sound | None = None,
     ) -> None:
         """Time in seconds"""
         self._time = 0
@@ -593,6 +631,7 @@ class TimerElement(Element):
         self.surface = self._get_timer_surface(self.format_timer(0, timer_type))
         self.rect = self.surface.get_rect(**position.dump())
         self.disabled = True
+        self.threshold_sound = threshold_sound
 
     def start(self, new_timer: float | None = None):
         if new_timer is not None:
@@ -612,10 +651,12 @@ class TimerElement(Element):
         self.timer -= new_time - self._current_time
         self._current_time = new_time
 
-        if last_timer > self._threshold and self.timer < self._threshold:
-            SoundManager.play(
-                config.TIMER_SOUND_PATH, GameManager.get_setting(SettingsKeys.volume)
-            )
+        if (
+            last_timer > self._threshold
+            and self.timer < self._threshold
+            and self.threshold_sound
+        ):
+            self.threshold_sound.play()
 
         if self.timer < 0:
             self.timer = 0
@@ -657,6 +698,6 @@ class TimerElement(Element):
     @timer.setter
     def timer(self, time: float):
         self._time = time
-        
+
     def click(self, events: list[Event]) -> bool:
         return super().click(events)

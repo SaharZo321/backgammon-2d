@@ -1,5 +1,5 @@
 import ipaddress
-import queue
+from queue import Queue, Empty as EmptyQueueError
 import socket
 from threading import Thread
 from typing import Callable, Any
@@ -8,6 +8,7 @@ import time
 
 import psutil
 from backgammon import OnlineBackgammon, Backgammon
+from decorators import run_threaded
 from models import OnlineGameState, ServerFlags
 from models import Move
 from pydantic_extra_types.color import Color
@@ -126,6 +127,10 @@ class BGServer:
         await writer.drain()
 
     def run_server(self):
+        if self.server_thread is not None:
+            print("Server already running.")
+            return
+        
         if self._stop_event.is_set():
             self._stop_event = asyncio.Event()
             print("Starting again.")
@@ -148,14 +153,13 @@ class BGServer:
                 except asyncio.CancelledError:
                     print("Server stopped.")
 
+        @run_threaded(daemon=True)
         def start():
             self.loop = asyncio.new_event_loop()
             asyncio.set_event_loop(self.loop)
             self.loop.run_until_complete(start_server())
 
-        if self.server_thread is None:
-            self.server_thread = Thread(target=start)
-            self.server_thread.start()
+        self.server_thread = start()
 
     def stop_server(self):
         print("Server shutting down")
@@ -217,16 +221,11 @@ class NetworkClient:
         self._timed_out_event = asyncio.Event()
         self._started_event = asyncio.Event()
         self._stop_event = asyncio.Event()
-        self.request_queue: queue.Queue[tuple[Any, Callable[[Any], None]]] = (
-            queue.Queue()
+        self.request_queue: Queue[tuple[Any, Callable[[Any], None]]] = (
+            Queue()
         )
         self.time_on_receive = 0
-
-        def connect_threaded():
-            asyncio.run(self.handle_connection())
-            print("Client disconnected")
-
-        self.client_thread = Thread(target=connect_threaded)
+        self.client_thread = None
 
     async def handle_connection(self):
         try:
@@ -252,7 +251,7 @@ class NetworkClient:
                 await self.handle_send_data(data=data, writer=writer)
                 self.request_queue.task_done()
                 await self.handle_recieved_data(on_recieve=on_recieve, reader=reader)
-            except queue.Empty:
+            except EmptyQueueError:
                 print("Empty queue...")
                 continue
 
@@ -296,15 +295,25 @@ class NetworkClient:
         self.request_queue.put(request)
 
     def connect(self):
-        if self._started_event.is_set():
-            print("Already connected connect again.")
-            return
-        self.request_queue = queue.Queue()
+        if self.client_thread:
+            print(f"Already connected to {self.host}.")
+
+        self.request_queue = Queue()
         self._started_event = asyncio.Event()
         self._stop_event = asyncio.Event()
-        self.client_thread.start()
+        
+        @run_threaded(daemon=True)
+        def connect_threaded():
+            asyncio.run(self.handle_connection())
+            print("Client disconnected")
+        
+        self.client_thread = connect_threaded()
 
     def disconnect(self, data=None, threaded=False):
+        if not self.client_thread:
+            print("Cannot disconnect. Client not connected")
+            return
+        
         if data is not None:
             self.send(data=data)
             self.request_queue.join()
@@ -312,10 +321,11 @@ class NetworkClient:
         if not threaded:
             self.client_thread.join()
         print(f"Disconnected from: {self.host}")
+        self.client_thread = None
 
     @property
     def connected(self):
-        return not self._stop_event.is_set()
+        return bool(self.client_thread)
 
     @property
     def started(self):

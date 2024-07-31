@@ -1,10 +1,10 @@
 import config
 from config import get_font
-from game_manager import GameManager, SettingsKeys
-from graphics.elements import BetterButtonElement, Element, TextFieldElement
-from graphics.elements import ButtonElement
+from game_manager import GameManager
+from graphics.elements import Element
 from graphics.graphics_manager import GraphicsManager
 from graphics.outline_text import OutlineText
+from graphics.styled_elements import StyledBetterButton, StyledButton, StyledTextField
 from menus.game_screens import BotGame, LocalClientGame, OfflineGame, OnlineClientGame
 from menus.menus import OptionsMenu
 from menus.screen import Screen
@@ -42,18 +42,14 @@ class LostConnection(Screen):
             nonlocal run
             run = False
 
-        back_button = ButtonElement(
+        back_button = StyledButton(
             position=Position(coords=(config.SCREEN.centerx, 650)),
             text_input="BACK",
             font=get_font(50),
-            base_color=config.BUTTON_COLOR,
-            hovering_color=config.BUTTON_HOVER_COLOR,
-            outline_color=pygame.Color("black"),
-            outline_size=1,
             on_click=back_click,
         )
 
-        buttons: list[ButtonElement] = [back_button]
+        buttons = [back_button]
 
         while run:
             GraphicsManager.render_background(screen)
@@ -79,7 +75,7 @@ class JoinRoomScreen(Screen):
     def start(cls, screen: pygame.Surface, clock: Clock):
         run = True
 
-        ip_address = GameManager.get_setting(SettingsKeys.ip)
+        ip_address = GameManager.options.ip
 
         def back_click():
             nonlocal run
@@ -89,28 +85,20 @@ class JoinRoomScreen(Screen):
             if not cls._is_valid_ip(ip_address):
                 return
             OnlineClientGame.start(screen=screen, clock=clock, ip_address=ip_address)
-            GameManager.set_setting(SettingsKeys.ip, ip_address)
+            GameManager.options.ip = ip_address
             back_click()
 
-        join_button = BetterButtonElement(
+        join_button = StyledBetterButton(
             position=Position(coords=(config.SCREEN.centerx, 500)),
             text_input="JOIN",
             font=get_font(70),
-            text_color=pygame.Color("black"),
-            base_color=config.BUTTON_COLOR,
-            hovering_color=config.BUTTON_HOVER_COLOR,
-            outline_color=pygame.Color("black"),
             on_click=join_click,
         )
 
-        back_button = ButtonElement(
+        back_button = StyledButton(
             position=Position(coords=(config.SCREEN.centerx, 650)),
             text_input="BACK",
             font=get_font(50),
-            base_color=config.BUTTON_COLOR,
-            hovering_color=config.BUTTON_HOVER_COLOR,
-            outline_color=pygame.Color("black"),
-            outline_size=1,
             on_click=back_click,
         )
         
@@ -118,7 +106,7 @@ class JoinRoomScreen(Screen):
             nonlocal ip_address
             ip_address = ip
         
-        ip_field = TextFieldElement(
+        ip_field = StyledTextField(
             font=get_font(60),
             position=Position(coords=(config.SCREEN.centerx, 300)),
             width=500,
@@ -184,40 +172,28 @@ class OnlineScreen(Screen):
             LocalClientGame.start(screen=screen, clock=clock)
             back_click()
 
-        join_room_button = BetterButtonElement(
+        join_room_button = StyledBetterButton(
             position=Position(coords=(config.SCREEN.centerx, 270)),
             text_input="JOIN ROOM",
             font=get_font(70),
-            text_color=pygame.Color("black"),
-            base_color=config.BUTTON_COLOR,
-            hovering_color=config.BUTTON_HOVER_COLOR,
-            outline_color=pygame.Color("black"),
             on_click=join_room_click,
         )
 
-        create_room_button = BetterButtonElement(
+        create_room_button = StyledBetterButton(
             position=Position(coords=(config.SCREEN.centerx, 420)),
             text_input="CREATE ROOM",
             font=get_font(70),
-            text_color=pygame.Color("black"),
-            base_color=config.BUTTON_COLOR,
-            hovering_color=config.BUTTON_HOVER_COLOR,
-            outline_color=pygame.Color("black"),
             on_click=create_room_click,
         )
 
-        back_button = ButtonElement(
+        back_button = StyledButton(
             position=Position(coords=(config.SCREEN.centerx, 650)),
             text_input="BACK",
             font=get_font(50),
-            base_color=config.BUTTON_COLOR,
-            hovering_color=config.BUTTON_HOVER_COLOR,
-            outline_color=pygame.Color("black"),
-            outline_size=1,
             on_click=back_click,
         )
 
-        buttons: list[ButtonElement] = [join_room_button, back_button, create_room_button]
+        buttons = [join_room_button, back_button, create_room_button]
 
         while run:
 
@@ -261,51 +237,35 @@ class PlayScreen(Screen):
         def online_button_click():
             OnlineScreen.start(screen, clock)
 
-        online_button = ButtonElement(
+        online_button = StyledBetterButton(
             position=Position(coords=(config.SCREEN.centerx, 180)),
-            text_input="PLAY ON LAN",
+            text_input="ON LAN",
             font=get_font(75),
-            base_color=config.BUTTON_COLOR,
-            hovering_color=config.BUTTON_HOVER_COLOR,
-            outline_color=pygame.Color("black"),
-            outline_size=1,
             on_click=online_button_click,
         )
 
-        bot_button = ButtonElement(
+        bot_button = StyledBetterButton(
             position=Position(coords=(config.SCREEN.centerx, 330)),
-            text_input="PLAY AGAINST BOT",
+            text_input="AGAINST BOT",
             font=get_font(75),
-            base_color=config.BUTTON_COLOR,
-            hovering_color=config.BUTTON_HOVER_COLOR,
-            outline_color=pygame.Color("black"),
-            outline_size=1,
             on_click=bot_button_click,
         )
 
-        offline_button = ButtonElement(
+        offline_button = StyledBetterButton(
             position=Position(coords=(config.SCREEN.centerx, 480)),
-            text_input="PLAY 1v1",
+            text_input="1v1",
             font=get_font(75),
-            base_color=config.BUTTON_COLOR,
-            hovering_color=config.BUTTON_HOVER_COLOR,
-            outline_color=pygame.Color("black"),
-            outline_size=1,
             on_click=offline_button_click,
         )
 
-        back_button = ButtonElement(
+        back_button = StyledButton(
             position=Position(coords=(config.SCREEN.centerx, 650)),
             text_input="BACK",
             font=get_font(50),
-            base_color=config.BUTTON_COLOR,
-            hovering_color=config.BUTTON_HOVER_COLOR,
-            outline_color=pygame.Color("black"),
-            outline_size=1,
             on_click=back_button_click,
         )
 
-        buttons: list[ButtonElement] = [online_button, bot_button, offline_button, back_button]
+        buttons = [online_button, bot_button, offline_button, back_button]
 
         while run:
             screen.fill("black")
@@ -363,34 +323,28 @@ class MainScreen(Screen):
             position=Position(coords=(config.SCREEN.centerx, 100)),
         )
 
-        play_button = BetterButtonElement(
+        play_button = StyledBetterButton(
             position=Position(coords=(config.SCREEN.centerx, 300)),
             text_input="PLAY",
             font=get_font(75),
-            base_color=config.BUTTON_COLOR,
-            hovering_color=config.BUTTON_HOVER_COLOR,
             on_click=play_button_click,
         )
 
-        options_button = BetterButtonElement(
+        options_button = StyledBetterButton(
             position=Position(coords=(config.SCREEN.centerx, 450)),
             text_input="OPTIONS",
             font=get_font(75),
-            base_color=config.BUTTON_COLOR,
-            hovering_color=config.BUTTON_HOVER_COLOR,
             on_click=options_button_click,
         )
 
-        quit_button = ButtonElement(
+        quit_button = StyledButton(
             position=Position(coords=(config.SCREEN.centerx, 650)),
             text_input="QUIT",
             font=get_font(50),
-            base_color=config.BUTTON_COLOR,
-            hovering_color=config.BUTTON_HOVER_COLOR,
             on_click=quit_button_click,
         )
 
-        buttons: list[ButtonElement] = [play_button, options_button, quit_button]
+        buttons = [play_button, options_button, quit_button]
         while True:
             clock.tick(config.FRAMERATE)
 

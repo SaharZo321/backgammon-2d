@@ -1,15 +1,17 @@
-from enum import Enum, StrEnum, auto
+from enum import StrEnum, auto
 import math
 import time
 from backgammon import Backgammon, BackgammonAI
 import config
 from config import get_font
-from game_manager import GameManager, SettingsKeys
+from decorators import debounce
+from game_manager import GameManager
 from graphics.elements import ButtonElement, Element, TimerElement
 import pygame
-from typing import Callable, Union
+from typing import Callable
 from graphics.graphics_manager import GraphicsManager
-from models import GameState, Move, Player, Position, ScoredMoves
+from graphics.styled_elements import StyledButton
+from models import ColorConverter, Move, Player, Position, ScoredMoves
 from sound_manager import SoundManager
 
 
@@ -62,33 +64,23 @@ class GameScreenElementKeys(StrEnum):
 
 class GameScreen(Screen):
 
-    done_button = ButtonElement(
+    done_button = StyledButton(
         text_input="DONE",
         font=get_font(50),
-        base_color=config.BUTTON_COLOR,
-        hovering_color=config.BUTTON_HOVER_COLOR,
     )
 
-    undo_button = ButtonElement(
+    undo_button = StyledButton(
         text_input="UNDO",
         font=get_font(50),
-        base_color=config.BUTTON_COLOR,
-        hovering_color=config.BUTTON_HOVER_COLOR,
     )
 
-    leave_button = ButtonElement(
+    leave_button = StyledButton(
         text_input="LEAVE",
         font=get_font(50),
-        base_color=config.BUTTON_COLOR,
-        hovering_color=config.BUTTON_HOVER_COLOR,
     )
 
-    options_button = ButtonElement(
+    options_button = StyledButton(
         image=config.OPTIONS_ICON,
-        text_input="",
-        font=get_font(50),
-        base_color=config.BUTTON_COLOR,
-        hovering_color=config.BUTTON_HOVER_COLOR,
     )
 
     timer = TimerElement(
@@ -112,10 +104,11 @@ class GameScreen(Screen):
     highlighted_indexes: list[int] = []
 
     @classmethod
+    @debounce(0.1)
     def play_piece_sound(cls):
         SoundManager.play(
             config.PIECE_SOUND_PATH,
-            volume=GameManager.get_setting(SettingsKeys.volume),
+            volume=GameManager.options.volume,
         )
 
     @classmethod
@@ -212,7 +205,7 @@ class GameScreen(Screen):
         cls.timer.start(config.TIMER)
         SoundManager.play(
             config.DICE_SOUND_PATH,
-            volume=GameManager.get_setting(SettingsKeys.volume),
+            volume=GameManager.options.volume,
         )
 
     @classmethod
@@ -319,8 +312,8 @@ class GameScreen(Screen):
     @classmethod
     def render_board(cls, is_online = True, opponent_color: pygame.Color | None = None):
         player_colors = {
-            Player.player1: GameManager.get_setting(SettingsKeys.piece_color),
-            Player.player2: GameManager.get_setting(SettingsKeys.opponent_color) if opponent_color is None else opponent_color,
+            Player.player1: ColorConverter.pydantic_to_pygame(GameManager.options.piece_color),
+            Player.player2: ColorConverter.pydantic_to_pygame(GameManager.options.opponent_color) if opponent_color is None else opponent_color,
         }
         cls.graphics.render_board(
             game_state=cls.backgammon.state, player_colors=player_colors, is_online=is_online

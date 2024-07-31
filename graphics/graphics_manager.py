@@ -1,4 +1,3 @@
-from pydantic_extra_types.color import Color as PydanticColor
 import pygame
 import pygame.gfxdraw
 import math
@@ -480,18 +479,6 @@ class GraphicsManager:
     @staticmethod
     def render_background(screen: pygame.Surface):
         screen.blit(config.BACKGROUND, (0, 0))
-
-
-class ColorConverter:
-    @staticmethod
-    def pydantic_to_pygame(pydantic_color: PydanticColor) -> pygame.Color:
-        rgb = pydantic_color.as_rgb_tuple()
-        return pygame.Color(*rgb)
-
-    @staticmethod
-    def pygame_to_pydantic(pygame_color: pygame.Color) -> PydanticColor:
-        rgb = pygame_color.r, pygame_color.g, pygame_color.b
-        return PydanticColor(value=rgb)
 
 
 def gradient_surface(

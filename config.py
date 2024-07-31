@@ -35,7 +35,7 @@ DICE_SOUND_PATH = asset(os.path.join("assets", "sounds", "dice.wav"))
 PIECE_SOUND_PATH = asset(os.path.join("assets", "sounds", "piece.mp3"))
 TIMER_SOUND_PATH = asset(os.path.join("assets", "sounds", "timer.wav"))
 
-TIMER = 10
+TIMER = 20
 
 def get_font(size: int, bold=False, italic=False) -> pygame.font.Font:
     return pygame.font.SysFont("Cooper Black", size, bold, italic)

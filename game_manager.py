@@ -1,33 +1,36 @@
+from typing import Literal
 import pygame
 import sys
 import config
-from enum import IntEnum, auto
-from typing import Any
-
-class SettingsKeys(IntEnum):
-    ip = auto()
-    piece_color = auto()
-    opponent_color = auto()
-    volume = auto()
-    mute_volume = auto()
+from models import ColorConverter, Options
+from sound_manager import SoundManager
 
 
 class GameManager:
     clock: pygame.time.Clock
     screen: pygame.Surface
-    _options: dict[SettingsKeys]
-    _options_menu: bool
+    options = Options(
+        ip="",
+        opponent_color=ColorConverter.pygame_to_pydantic(pygame.Color(150, 100, 100)),
+        piece_color=ColorConverter.pygame_to_pydantic(pygame.Color(100, 100, 100)),
+        volume=1,
+        mute_volume=1,
+    )
+    
+    sound_manager: SoundManager
+    
+    
+    @classmethod
+    def get_sound(cls, key: Literal["button", "timer", "piece", "dice"]):
+        return cls.sound_manager.get_sound(key)
+
+    @classmethod
+    def set_volume(cls, volume: float):
+        cls.options.volume = volume
+        cls.sound_manager.set_volume(volume)
 
     @classmethod
     def start(cls):
-        cls._options = {
-            SettingsKeys.ip: "",
-            SettingsKeys.opponent_color: pygame.Color(150, 100, 100),
-            SettingsKeys.piece_color: pygame.Color(100, 100, 100),
-            SettingsKeys.volume: 1,
-            SettingsKeys.mute_volume: 1,
-            
-        }
         pygame.init()
         pygame.font.init()
         pygame.mixer.init()
@@ -35,6 +38,12 @@ class GameManager:
         cls.clock = pygame.time.Clock()
         cls.screen = pygame.display.set_mode(config.RESOLUTION)
         pygame.display.set_icon(config.GAME_ICON)
+        cls.sound_manager = SoundManager(
+            button=config.BUTTON_SOUND_PATH,
+            timer=config.TIMER_SOUND_PATH,
+            piece=config.PIECE_SOUND_PATH,
+            dice=config.DICE_SOUND_PATH,
+        )
 
     @staticmethod
     def quit():
@@ -42,14 +51,5 @@ class GameManager:
         sys.exit()
 
     @classmethod
-    def set_setting(cls, key: SettingsKeys, value: Any):
-        cls._options[key] = value
-        
-    @classmethod
-    def get_setting(cls, key: SettingsKeys) -> Any:
-        return cls._options[key]
-    
-    @classmethod
     def is_window_focused(cls):
         return pygame.key.get_focused()
-    

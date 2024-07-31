@@ -1,6 +1,7 @@
 import random
 from threading import Thread
 import time
+from decorators import run_threaded
 from models import GameState, MoveType, OnlineGameState, ScoredMoves
 from models import Player
 import copy
@@ -635,9 +636,9 @@ class BackgammonAI:
 
         game_copy = game.deepcopy()
 
+        @run_threaded(daemon=True)
         def get_move():
             moves = cls._threaded_get_best_move(game_copy)
             callback(moves)
 
-        thread = Thread(target=get_move)
-        thread.start()
+        get_move()

@@ -7,13 +7,13 @@ from pygame.time import Clock
 from backgammon import Backgammon
 from backgammon import BackgammonAI
 import config
-from game_manager import GameManager, SettingsKeys
+from game_manager import GameManager
 from graphics.elements import ButtonElement, TimerElement
-from graphics.graphics_manager import ColorConverter, GraphicsManager
+from graphics.graphics_manager import GraphicsManager
 from menus.menus import ConnectingMenu, LostConnectionMenu, UnfocusedMenu, WaitingMenu
 from menus.screen import GameScreen, GameScreenElementKeys
 from menus.menus import OptionsMenu
-from models import GameState, Move, MoveType, OnlineGameState, ScoredMoves, ServerFlags
+from models import ColorConverter, GameState, Move, MoveType, OnlineGameState, ScoredMoves, ServerFlags
 from models import Player
 from network import BGServer, NetworkClient
 
@@ -157,6 +157,7 @@ class OfflineGame(GameScreen):
 
     @classmethod
     def start(cls, screen: Surface, clock: Clock):
+        cls.run = True
         cls.graphics = GraphicsManager(screen=screen)
         cls.backgammon = Backgammon()
         cls.last_clicked_index = -1
@@ -283,12 +284,8 @@ class LocalClientGame(GameScreen):
         cls.server = BGServer(
             port=config.GAME_PORT,
             buffer_size=config.NETWORK_BUFFER,
-            local_color=ColorConverter.pygame_to_pydantic(
-                GameManager.get_setting(SettingsKeys.piece_color)
-            ),
-            online_color=ColorConverter.pygame_to_pydantic(
-                GameManager.get_setting(SettingsKeys.opponent_color)
-            ),
+            local_color=GameManager.options.piece_color,
+            online_color=GameManager.options.opponent_color,
         )
         cls.online_state = cls.server.local_get_game_state()
         cls.online_state.current_turn = Player.other(cls.online_state.current_turn)
@@ -472,15 +469,15 @@ class OnlineClientGame(GameScreen):
 
         cls.refresh_frequency = 0.5  # in seconds
 
-        piece_color = GameManager.get_setting(SettingsKeys.piece_color)
-        opponent_color = GameManager.get_setting(SettingsKeys.opponent_color)
+        piece_color = GameManager.options.piece_color
+        opponent_color = GameManager.options.opponent_color
 
         cls.backgammon = Backgammon()
         cls.online_state = OnlineGameState(
             **cls.backgammon.state.model_dump(),
             history_length=0,
-            online_color=ColorConverter.pygame_to_pydantic(piece_color),
-            local_color=ColorConverter.pygame_to_pydantic(opponent_color),
+            online_color=piece_color,
+            local_color=opponent_color,
         )
 
         cls.network_client = NetworkClient(
@@ -659,9 +656,8 @@ class OnlineClientGame(GameScreen):
 
     @classmethod
     def send_color(cls):
-        piece_color: pygame.Color = GameManager.get_setting(SettingsKeys.piece_color)
         cls.network_client.send(
-            data=ColorConverter.pygame_to_pydantic(piece_color),
+            data=GameManager.options.piece_color,
             on_recieve=cls.save_state,
         )
 
