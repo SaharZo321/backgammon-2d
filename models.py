@@ -99,8 +99,7 @@ class Position(BaseModel):
 
 class Options(BaseModel):
     ip: str
-    opponent_color: PydanticColor
-    piece_color: PydanticColor
+    player_colors: dict[Player, PydanticColor]
     volume: float
     mute_volume: float
 

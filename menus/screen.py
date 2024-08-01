@@ -87,6 +87,7 @@ class GameScreen(Screen):
         font=get_font(50),
         timer_type="sec",
         threshold=10,
+        threshold_sound=GameManager.get_sound("timer")
     )
 
     game_buttons = [done_button, undo_button]
@@ -201,7 +202,7 @@ class GameScreen(Screen):
         cls.timer.on_done = cls.setup_bot
 
     @classmethod
-    def next_turn(cls):
+    def play_next_turn_sounds(cls):
         cls.timer.start(config.TIMER)
         SoundManager.play(
             config.DICE_SOUND_PATH,
@@ -210,9 +211,6 @@ class GameScreen(Screen):
 
     @classmethod
     def setup_bot(cls):
-        if not cls.is_my_turn():
-            return
-        
         def save_ai_moves(scored_moves: ScoredMoves):
             cls.ai_moves = scored_moves.moves
             print(cls.ai_moves)
@@ -312,8 +310,8 @@ class GameScreen(Screen):
     @classmethod
     def render_board(cls, is_online = True, opponent_color: pygame.Color | None = None):
         player_colors = {
-            Player.player1: ColorConverter.pydantic_to_pygame(GameManager.options.piece_color),
-            Player.player2: ColorConverter.pydantic_to_pygame(GameManager.options.opponent_color) if opponent_color is None else opponent_color,
+            Player.player1: ColorConverter.pydantic_to_pygame(GameManager.options.player_colors[Player.player1]),
+            Player.player2: ColorConverter.pydantic_to_pygame(GameManager.options.player_colors[Player.player2]) if opponent_color is None else opponent_color,
         }
         cls.graphics.render_board(
             game_state=cls.backgammon.state, player_colors=player_colors, is_online=is_online

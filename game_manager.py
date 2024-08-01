@@ -2,7 +2,7 @@ from typing import Literal
 import pygame
 import sys
 import config
-from models import ColorConverter, Options
+from models import ColorConverter, Options, Player
 from sound_manager import SoundManager
 
 
@@ -11,15 +11,20 @@ class GameManager:
     screen: pygame.Surface
     options = Options(
         ip="",
-        opponent_color=ColorConverter.pygame_to_pydantic(pygame.Color(150, 100, 100)),
-        piece_color=ColorConverter.pygame_to_pydantic(pygame.Color(100, 100, 100)),
+        player_colors={
+            Player.player1: ColorConverter.pygame_to_pydantic(
+                pygame.Color(100, 100, 100)
+            ),
+            Player.player2: ColorConverter.pygame_to_pydantic(
+                pygame.Color(150, 100, 100)
+            ),
+        },
         volume=1,
         mute_volume=1,
     )
-    
+
     sound_manager: SoundManager
-    
-    
+
     @classmethod
     def get_sound(cls, key: Literal["button", "timer", "piece", "dice"]):
         return cls.sound_manager.get_sound(key)

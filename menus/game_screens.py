@@ -31,9 +31,10 @@ class BotGame(GameScreen):
 
         cls.set_up_elements()
 
-        cls.next_turn()
+        cls.play_next_turn_sounds()
 
-        if cls.is_my_turn():
+        if not cls.is_my_turn():
+            print("hello")
             cls.setup_bot()
 
         while cls.run:
@@ -46,8 +47,6 @@ class BotGame(GameScreen):
             if cls.bot and time.time() - cls.bot_current_time > 1:
                 cls.move_bot(on_game_over=cls.done_turn)
 
-            cls.update_game_buttons()
-
             events = pygame.event.get()
 
             cls.check_quit(events=events, quit=GameManager.quit)
@@ -59,6 +58,7 @@ class BotGame(GameScreen):
                 update_condition=not cls.is_screen_on_top(),
             )
 
+            cls.update_game_buttons()
             cls.highlight_tracks()
 
             if not cls.is_screen_on_top():
@@ -66,7 +66,7 @@ class BotGame(GameScreen):
 
                 cls.click_elements(elements=cls.always_on_buttons, events=events)
 
-            if not cls.is_screen_on_top() and not cls.is_my_turn():
+            if not cls.is_screen_on_top() and cls.is_my_turn():
 
                 cursor = cls.get_cursor(elements=cls.all_elements)
 
@@ -108,22 +108,23 @@ class BotGame(GameScreen):
     @classmethod
     def done_turn(cls):
         cls.last_clicked_index = -1
-        cls.next_turn()
+        cls.play_next_turn_sounds()
 
         if cls.backgammon.is_game_over():
             cls.backgammon.new_game(cls.backgammon.winner)
-            if cls.is_my_turn():
+            if not cls.is_my_turn():
                 cls.setup_bot()
             return
 
         cls.backgammon.switch_turn()
         print(f"is bot turn: {cls.is_my_turn()}")
-        if cls.is_my_turn():
+        if not cls.is_my_turn():
             cls.setup_bot()
 
     @classmethod
     def on_random_click(cls):
         cls.last_clicked_index = -1
+        print(cls.is_my_turn())
 
     @classmethod
     def has_history(cls):
@@ -166,7 +167,7 @@ class OfflineGame(GameScreen):
 
         cls.set_up_elements()
 
-        cls.next_turn()
+        cls.play_next_turn_sounds()
 
         while cls.run:
             clock.tick(config.FRAMERATE)
@@ -230,7 +231,7 @@ class OfflineGame(GameScreen):
     @classmethod
     def done_turn(cls):
         cls.last_clicked_index = -1
-        cls.next_turn()
+        cls.play_next_turn_sounds()
         if cls.backgammon.is_game_over():
             cls.backgammon.new_game(cls.backgammon.winner)
             return
@@ -284,8 +285,8 @@ class LocalClientGame(GameScreen):
         cls.server = BGServer(
             port=config.GAME_PORT,
             buffer_size=config.NETWORK_BUFFER,
-            local_color=GameManager.options.piece_color,
-            online_color=GameManager.options.opponent_color,
+            local_color=GameManager.options.player_colors[Player.player1],
+            online_color=GameManager.options.player_colors[Player.player2],
         )
         cls.online_state = cls.server.local_get_game_state()
         cls.online_state.current_turn = Player.other(cls.online_state.current_turn)
@@ -370,7 +371,7 @@ class LocalClientGame(GameScreen):
             or state.score[p2] + state.score[p1]
             != cls.backgammon.score[p2] + cls.backgammon.score[p1]
         ):
-            cls.next_turn()
+            cls.play_next_turn_sounds()
             
         if not cls.online_state.is_board_equal(state=state):
             cls.play_piece_sound()
@@ -469,8 +470,8 @@ class OnlineClientGame(GameScreen):
 
         cls.refresh_frequency = 0.5  # in seconds
 
-        piece_color = GameManager.options.piece_color
-        opponent_color = GameManager.options.opponent_color
+        piece_color = GameManager.options.player_colors[Player.player1]
+        opponent_color = GameManager.options.player_colors[Player.player2]
 
         cls.backgammon = Backgammon()
         cls.online_state = OnlineGameState(
@@ -645,7 +646,7 @@ class OnlineClientGame(GameScreen):
             or state.score[p2] + state.score[p1]
             != cls.online_state.score[p2] + cls.online_state.score[p1]
         ):
-            cls.next_turn()
+            cls.play_next_turn_sounds()
 
         if not cls.online_state.is_board_equal(state=state):
             cls.play_piece_sound()
@@ -657,7 +658,7 @@ class OnlineClientGame(GameScreen):
     @classmethod
     def send_color(cls):
         cls.network_client.send(
-            data=GameManager.options.piece_color,
+            data=GameManager.options.player_colors[Player.player1],
             on_recieve=cls.save_state,
         )
 

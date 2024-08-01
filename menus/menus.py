@@ -14,11 +14,12 @@ from graphics.styled_elements import StyledBetterButton, StyledButton, StyledSli
 from menus.screen import Screen
 import pygame
 
-from models import ColorConverter, Position
+from models import ColorConverter, Player, Position
 
 
 class Menu(Screen):
     """Rendered on top of another screen. Uses its events"""
+
     @classmethod
     def start(
         cls,
@@ -31,20 +32,17 @@ class Menu(Screen):
 
 
 class OptionsMenu(Menu):
-    
-    current_color = ColorConverter.pydantic_to_pygame(GameManager.options.piece_color)
+
+    current_player = Player.player1
     current_volume = GameManager.options.volume
-    
+    current_color = ColorConverter.pydantic_to_pygame(GameManager.options.player_colors[current_player])
 
     red_slider = StyledSlider(
         min_value=0,
         max_value=255,
-        label="RED",
-        position=Position(coords=(config.SCREEN.centerx, 190)),
-        label_color=pygame.Color("red"),
+        position=Position(coords=(config.SCREEN.centerx, 240)),
         default_value=current_color.r,
-        label_position="top",
-        id="red",
+        id="r",
         slider_surface=draw_border(
             surface=gradient_surface(
                 left_colour=pygame.Color("black"),
@@ -59,12 +57,9 @@ class OptionsMenu(Menu):
     green_slider = StyledSlider(
         min_value=0,
         max_value=255,
-        label="GREEN",
-        position=Position(coords=(config.SCREEN.centerx, 270)),
+        position=Position(coords=(config.SCREEN.centerx, 280)),
         default_value=current_color.g,
-        id="green",
-        label_position="top",
-        label_color=pygame.Color("green"),
+        id="g",
         slider_surface=draw_border(
             surface=gradient_surface(
                 left_colour=pygame.Color("black"),
@@ -79,12 +74,9 @@ class OptionsMenu(Menu):
     blue_slider = StyledSlider(
         min_value=0,
         max_value=255,
-        label="BLUE",
-        position=Position(coords=(config.SCREEN.centerx, 350)),
+        position=Position(coords=(config.SCREEN.centerx, 320)),
         default_value=current_color.b,
-        id="blue",
-        label_color=pygame.Color("blue"),
-        label_position="top",
+        id="b",
         slider_surface=draw_border(
             surface=gradient_surface(
                 left_colour=pygame.Color("black"),
@@ -104,15 +96,15 @@ class OptionsMenu(Menu):
         ),
         padding=15,
     )
-    
+
     volume_slider = StyledSlider(
         min_value=0,
         max_value=1,
         step=0.05,
         label=volume_button,
-        position=Position(coords=(config.SCREEN.centerx, 470)),
+        position=Position(coords=(config.SCREEN.centerx, 520)),
         default_value=current_volume,
-        label_position="top",
+        label_position="bottom",
         id="volume",
     )
 
@@ -121,7 +113,7 @@ class OptionsMenu(Menu):
         text_input="BACK",
         font=get_font(50),
     )
-    
+
     options_text = OutlineText(
         text="OPTIONS",
         font=get_font(80),
@@ -130,7 +122,13 @@ class OptionsMenu(Menu):
         outline_width=3,
         position=Position(coords=(config.SCREEN.centerx, 70)),
     )
-    
+
+    player_button = StyledBetterButton(
+        position=Position(coords=(config.SCREEN.centerx, 200)),
+        font=get_font(24),
+        text_input="player1",
+    )
+
     elements: list[Element] = [
         back_button,
         volume_button,
@@ -138,31 +136,52 @@ class OptionsMenu(Menu):
         red_slider,
         blue_slider,
         volume_slider,
+        player_button,
     ]
-    
+
     @classmethod
     def get_volume_button_image(cls):
         return pygame.transform.scale(
             config.MUTE_ICON if cls.current_volume == 0 else config.VOLUME_ICON,
             (30, 30),
         )
-    
+
     @classmethod
     def set_volume(cls, value: float, id: str | None = None):
         GameManager.set_volume(value)
 
     @classmethod
+    def switch_player(cls):
+        cls.current_player = Player.other(cls.current_player)
+        cls.player_button.text_input = str(cls.current_player)
+        current_color = cls.get_current_color()
+        cls.red_slider.value = current_color.r
+        cls.green_slider.value = current_color.g
+        cls.blue_slider.value = current_color.b
+
+    @classmethod
+    def get_current_color(cls):
+        return ColorConverter.pydantic_to_pygame(GameManager.options.player_colors[cls.current_player])
+    
+    @classmethod
     @debounce(0.1)
     def set_color(cls, value: float, id: str):
+        old_color = ColorConverter.pydantic_to_pygame(
+            GameManager.options.player_colors[cls.current_player]
+        )
         color = {
-            "red": cls.current_color.r,
-            "green": cls.current_color.g,
-            "blue": cls.current_color.b,
+            "r": old_color.r,
+            "g": old_color.g,
+            "b": old_color.b,
         }
-        color[id] = math.floor(value)
-        new_color = ColorConverter.pygame_to_pydantic(pygame.Color(color["red"], color["green"], color["blue"]))
-        GameManager.options.piece_color = new_color
-    
+        color[id] = round(value)
+
+        new_color = pygame.Color(*color.values())
+
+        GameManager.options.player_colors[cls.current_player] = (
+            ColorConverter.pygame_to_pydantic(new_color)
+        )
+
     @classmethod
     def toggle_mute(cls):
         if cls.current_volume > 0:
@@ -170,8 +189,7 @@ class OptionsMenu(Menu):
             cls.volume_slider.value = 0
         else:
             cls.volume_slider.value = GameManager.options.mute_volume
-        
-    
+
     @classmethod
     def start(
         cls,
@@ -188,9 +206,6 @@ class OptionsMenu(Menu):
             menu_surface.fill(pygame.Color(0, 0, 0, 200))
             screen.blit(source=menu_surface, dest=(0, 0))
 
-        cls.current_color = ColorConverter.pydantic_to_pygame(GameManager.options.piece_color)
-        cls.current_volume = GameManager.options.volume
-
         cls.back_button.on_click = close
         cls.blue_slider.on_value_change = cls.set_color
         cls.green_slider.on_value_change = cls.set_color
@@ -198,13 +213,17 @@ class OptionsMenu(Menu):
         cls.volume_slider.on_value_change = cls.set_volume
         cls.volume_button.on_click = cls.toggle_mute
         cls.volume_button.image = cls.get_volume_button_image()
-        
+        cls.player_button.on_click = cls.switch_player
+
         GraphicsManager.render_piece(
-            screen, center=(450, 290), color=cls.current_color, radius=50
+            screen,
+            center=(config.SCREEN.centerx, 400),
+            color=cls.get_current_color(),
+            radius=50,
         )
-        
+
         cls.options_text.update(screen)
-        
+
         pygame.mouse.set_cursor(cls._get_cursor(elements=cls.elements))
         cls.render_elements(screen=screen, elements=cls.elements, events=events)
         cls.click_elements(elements=cls.elements, events=events)
@@ -252,7 +271,9 @@ class UnfocusedMenu(Menu):
             text_color=pygame.Color("white"),
             outline_color=pygame.Color("black"),
             outline_width=3,
-            position=Position(coords=(config.SCREEN.centerx, round(config.RESOLUTION[1] / 2.5))),
+            position=Position(
+                coords=(config.SCREEN.centerx, round(config.RESOLUTION[1] / 2.5))
+            ),
         )
 
         pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
@@ -358,4 +379,3 @@ class LostConnectionMenu(Menu):
         pygame.mouse.set_cursor(cls._get_cursor(elements=[leave_button]))
 
         cls.click_elements(elements=[leave_button], events=events)
-        

@@ -96,12 +96,11 @@ class StyledSlider(SliderElement):
         slider_surface: Surface | None = None,
         slider_color: pygame.Color = pygame.Color("white"),
         knob_color: pygame.Color = pygame.Color("white"),
-        label: str | Surface | ButtonElement = "",
+        label: Surface | ButtonElement = pygame.Surface((0,0)),
         label_position: (
             Literal["top"] | Literal["bottom"] | Literal["left"] | Literal["right"]
         ) = "right",
         label_padding: int = 10,
-        label_color: pygame.Color = pygame.Color("white"),
         on_value_change: Callable[[float, str], None] = lambda x, y: None,
         id: str = "",
         show_value: bool = False,
@@ -120,7 +119,6 @@ class StyledSlider(SliderElement):
             label=label,
             label_position=label_position,
             label_padding=label_padding,
-            label_color=label_color,
             on_value_changed=on_value_change,
             id=id,
             show_value=show_value,

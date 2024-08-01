@@ -316,10 +316,9 @@ class SliderElement(Element):
         slider_surface: pygame.Surface | None = None,
         slider_color: pygame.Color = pygame.Color("white"),
         knob_color: pygame.Color = pygame.Color("white"),
-        label: str | pygame.Surface | ButtonElement = "",
+        label: pygame.Surface | ButtonElement = pygame.Surface((0,0)),
         label_position: RelativePosition = "right",
         label_padding: int = 10,
-        label_color: pygame.Color = pygame.Color("white"),
         on_value_changed: Callable[[float, str], None] = lambda x, y: None,
         id: str = "",
         show_value: bool = False,
@@ -339,10 +338,11 @@ class SliderElement(Element):
         self.slider_size = slider_size
         self.disabled = False
         self.show_value = show_value
-        self.label_padding = label_padding
         self.drag = False
         self.time_hovering = 0
-
+        self._label_position = label_position
+        self._position = position
+        
         if type(slider_surface) is pygame.Surface:
             self.slider_surface = pygame.transform.scale(slider_surface, slider_size)
         else:
@@ -350,39 +350,22 @@ class SliderElement(Element):
             self.slider_surface.fill(slider_color)
             pygame.draw.rect(self.slider_surface, "black", (0, 0) + (slider_size), 2)
 
-        if type(label) is str:
-            self.label = OutlineText.get_surface(
-                text=label,
-                font=get_font(math.floor(self.slider_height * 0.8)),
-                text_color=label_color,
-                outline_color=pygame.Color("black"),
-            )
-        elif isinstance(label, ButtonElement):
+        self.label = label
+        
+        if isinstance(label, ButtonElement):
             self.label = pygame.Surface(
                 label.surface.get_size(), flags=pygame.SRCALPHA, depth=32
             )
             self.label.convert_alpha()
-        elif type(label) is pygame.Surface:
-            self.label = label
 
-        label_size = self.label.get_size()
-        match label_position:
-            case "left" | "right":
-                width = slider_size[0] + label_padding + label_size[0]
-                height = max(slider_size[1], label_size[1])
-                self.rect = pygame.Surface((width, height)).get_rect(**position.dump())
-            case "top" | "bottom":
-                width = max(slider_size[0], label_size[0])
-                height = slider_size[1] + label_padding + label_size[1]
-                self.rect = pygame.Surface((width, height)).get_rect(**position.dump())
+        self.label_padding = label_padding if self.label.get_size()[0] else 0
         self.label_position = label_position
-        self.set_elements_position(label_position)
 
         if isinstance(label, ButtonElement):
             label.rect = self._label_rect
 
         self.slider_color = slider_color
-
+    
     def render(self, surface: pygame.Surface) -> None:
         if self.show_value:
             self._render_value()
@@ -470,9 +453,26 @@ class SliderElement(Element):
         self.on_value_change(new_value, self.id)
         self._value = new_value
 
-    def set_elements_position(self, position: RelativePosition):
+    @property
+    def label_position(self):
+        return self._label_position
 
-        match position:
+    @label_position.setter
+    def label_position(self, label_position: RelativePosition):
+        self._label_position = label_position
+        
+        label_size = self.label.get_size()
+        match label_position:
+            case "left" | "right":
+                width = self.slider_size[0] + self.label_padding + label_size[0]
+                height = max(self.slider_size[1], label_size[1])
+                self.rect = pygame.Surface((width, height)).get_rect(**self.position.dump())
+            case "top" | "bottom":
+                width = max(self.slider_size[0], label_size[0])
+                height = self.slider_size[1] + self.label_padding + label_size[1]
+                self.rect = pygame.Surface((width, height)).get_rect(**self.position.dump())
+        
+        match label_position:
             case "left":
                 self._label_rect = self.label.get_rect(midleft=self.rect.midleft)
                 self._slider_rect = self.slider_surface.get_rect(
