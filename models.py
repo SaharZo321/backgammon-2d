@@ -1,6 +1,6 @@
 from enum import StrEnum, auto
 from typing import Literal
-from pydantic import BaseModel, Field, ValidationInfo, field_validator
+from pydantic import BaseModel, Field
 from pydantic_extra_types.color import Color as PydanticColor
 import pygame
 
@@ -100,16 +100,6 @@ class Position(BaseModel):
 class Options(BaseModel):
     ip: str
     player_colors: dict[Player, PydanticColor]
-    volume: float
-    mute_volume: float
-
-    @field_validator("volume", "mute_volume")
-    @classmethod
-    def check_volume(cls, value: float, info: ValidationInfo):
-        if isinstance(value, float):
-            between_zero_and_one = 0 <= value <= 1
-            assert between_zero_and_one, f"{info.field_name} must be between 0 and 1"
-        return value
 
 
 class ColorConverter:
@@ -122,3 +112,11 @@ class ColorConverter:
     def pygame_to_pydantic(pygame_color: pygame.Color) -> PydanticColor:
         rgb = pygame_color.r, pygame_color.g, pygame_color.b
         return PydanticColor(value=rgb)
+
+class GameSound(BaseModel):
+    path: str
+    key: str
+    
+    def dump(self):
+        return {self.key: self.path}
+    

@@ -1,4 +1,3 @@
-from typing import Literal
 import pygame
 import sys
 import config
@@ -19,21 +18,10 @@ class GameManager:
                 pygame.Color(150, 100, 100)
             ),
         },
-        volume=1,
-        mute_volume=1,
     )
 
     sound_manager: SoundManager
-
-    @classmethod
-    def get_sound(cls, key: Literal["button", "timer", "piece", "dice"]):
-        return cls.sound_manager.get_sound(key)
-
-    @classmethod
-    def set_volume(cls, volume: float):
-        cls.options.volume = volume
-        cls.sound_manager.set_volume(volume)
-
+    
     @classmethod
     def start(cls):
         pygame.init()
@@ -44,10 +32,12 @@ class GameManager:
         cls.screen = pygame.display.set_mode(config.RESOLUTION)
         pygame.display.set_icon(config.GAME_ICON)
         cls.sound_manager = SoundManager(
-            button=config.BUTTON_SOUND_PATH,
-            timer=config.TIMER_SOUND_PATH,
-            piece=config.PIECE_SOUND_PATH,
-            dice=config.DICE_SOUND_PATH,
+            sounds={
+                **config.BUTTON_SOUND.dump(),
+                **config.DICE_SOUND.dump(),
+                **config.TIMER_SOUND.dump(),
+                **config.PIECE_SOUND.dump(),
+            }
         )
 
     @staticmethod

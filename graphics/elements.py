@@ -389,11 +389,11 @@ class SliderElement(Element):
         ):
             return False
 
-        if self.sound:
-            self.sound.play()
         mouse_position = pygame.mouse.get_pos()
         self.value = self._position_to_value(mouse_position)
         self.drag = True
+        if self.sound:
+            self.sound.play()
         return True
 
     def update(self, events: list[pygame.event.Event]) -> None:

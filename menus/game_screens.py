@@ -31,7 +31,7 @@ class BotGame(GameScreen):
 
         cls.set_up_elements()
 
-        cls.play_next_turn_sounds()
+        cls.start_timer()
 
         if not cls.is_my_turn():
             print("hello")
@@ -104,11 +104,12 @@ class BotGame(GameScreen):
     @classmethod
     def stop(cls):
         cls.run = False
+        GameManager.sound_manager.stop_all(exclude=[config.BUTTON_SOUND.key])
 
     @classmethod
     def done_turn(cls):
         cls.last_clicked_index = -1
-        cls.play_next_turn_sounds()
+        cls.start_timer()
 
         if cls.backgammon.is_game_over():
             cls.backgammon.new_game(cls.backgammon.winner)
@@ -167,7 +168,7 @@ class OfflineGame(GameScreen):
 
         cls.set_up_elements()
 
-        cls.play_next_turn_sounds()
+        cls.start_timer()
 
         while cls.run:
             clock.tick(config.FRAMERATE)
@@ -227,11 +228,12 @@ class OfflineGame(GameScreen):
     @classmethod
     def stop(cls):
         cls.run = False
+        GameManager.sound_manager.stop_all(exclude=[config.BUTTON_SOUND.key])
 
     @classmethod
     def done_turn(cls):
         cls.last_clicked_index = -1
-        cls.play_next_turn_sounds()
+        cls.start_timer()
         if cls.backgammon.is_game_over():
             cls.backgammon.new_game(cls.backgammon.winner)
             return
@@ -371,7 +373,7 @@ class LocalClientGame(GameScreen):
             or state.score[p2] + state.score[p1]
             != cls.backgammon.score[p2] + cls.backgammon.score[p1]
         ):
-            cls.play_next_turn_sounds()
+            cls.start_timer()
             
         if not cls.online_state.is_board_equal(state=state):
             cls.play_piece_sound()
@@ -391,6 +393,7 @@ class LocalClientGame(GameScreen):
     def stop(cls):
         cls.server.stop_server()
         cls.run = False
+        GameManager.sound_manager.stop_all(exclude=[config.BUTTON_SOUND.key])
 
     @classmethod
     def done_turn(cls):
@@ -616,6 +619,7 @@ class OnlineClientGame(GameScreen):
     def stop(cls):
         cls.network_client.disconnect(data=ServerFlags.leave)
         cls.run = False
+        GameManager.sound_manager.stop_all(exclude=[config.BUTTON_SOUND.key])
 
     @classmethod
     def done_turn(cls):
@@ -646,7 +650,7 @@ class OnlineClientGame(GameScreen):
             or state.score[p2] + state.score[p1]
             != cls.online_state.score[p2] + cls.online_state.score[p1]
         ):
-            cls.play_next_turn_sounds()
+            cls.start_timer()
 
         if not cls.online_state.is_board_equal(state=state):
             cls.play_piece_sound()

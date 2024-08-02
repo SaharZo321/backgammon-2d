@@ -1,7 +1,10 @@
 import math
+from typing import Literal
 import pygame
 from asset import asset
 import os
+
+from models import GameSound
 
 DEFAULT_PLAYER1_COLOR = pygame.Color(100, 100, 100)
 DEFAULT_PLAYER2_COLOR = pygame.Color(150, 100, 100)
@@ -30,10 +33,12 @@ MUTE_ICON = pygame.transform.scale(
     pygame.image.load(asset(os.path.join("assets", "images", "mute.png"))), (60, 60)
 )
 
-BUTTON_SOUND_PATH = asset(os.path.join("assets", "sounds", "button.wav"))
-DICE_SOUND_PATH = asset(os.path.join("assets", "sounds", "dice.wav"))
-PIECE_SOUND_PATH = asset(os.path.join("assets", "sounds", "piece.mp3"))
-TIMER_SOUND_PATH = asset(os.path.join("assets", "sounds", "timer.wav"))
+type x = dict[Literal["button"], str]
+
+BUTTON_SOUND = GameSound(key="button", path=asset(os.path.join("assets", "sounds", "button.wav")))
+DICE_SOUND = GameSound(key="dice", path=asset(os.path.join("assets", "sounds", "dice.wav")))
+PIECE_SOUND = GameSound(key="piece", path=asset(os.path.join("assets", "sounds", "piece.mp3")))
+TIMER_SOUND = GameSound(key="timer", path=asset(os.path.join("assets", "sounds", "timer.wav")))
 
 TIMER = 20
 

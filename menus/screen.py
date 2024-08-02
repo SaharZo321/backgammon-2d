@@ -12,7 +12,6 @@ from typing import Callable
 from graphics.graphics_manager import GraphicsManager
 from graphics.styled_elements import StyledButton
 from models import ColorConverter, Move, Player, Position, ScoredMoves
-from sound_manager import SoundManager
 
 
 class Screen:
@@ -87,7 +86,7 @@ class GameScreen(Screen):
         font=get_font(50),
         timer_type="sec",
         threshold=10,
-        threshold_sound=GameManager.get_sound("timer")
+        threshold_sound=GameManager.sound_manager.get_sound(config.TIMER_SOUND.key),
     )
 
     game_buttons = [done_button, undo_button]
@@ -107,10 +106,7 @@ class GameScreen(Screen):
     @classmethod
     @debounce(0.1)
     def play_piece_sound(cls):
-        SoundManager.play(
-            config.PIECE_SOUND_PATH,
-            volume=GameManager.options.volume,
-        )
+        GameManager.sound_manager.play(config.PIECE_SOUND.key)
 
     @classmethod
     def get_highlighted_tracks(cls):
@@ -147,13 +143,14 @@ class GameScreen(Screen):
             return
 
         index = cls.graphics.check_track_input()
-        
+
         if cls.graphics.check_home_track_input(player=cls.backgammon.current_turn):
             cls.on_bear_off()
             cls.play_piece_sound()
         elif index != -1:  # clicked on track
             if (
-                cls.last_clicked_index == -1 and cls.backgammon.get_captured_pieces() == 0
+                cls.last_clicked_index == -1
+                and cls.backgammon.get_captured_pieces() == 0
             ):  # clicked on a movable piece
                 cls.on_choose_piece(index)
 
@@ -171,9 +168,7 @@ class GameScreen(Screen):
             cls.on_random_click()
 
     @classmethod
-    def set_up_elements(
-        cls
-    ):
+    def set_up_elements(cls):
         right_center = math.floor((cls.graphics.RECT.right + config.RESOLUTION[0]) / 2)
         left_center = math.floor(cls.graphics.RECT.left / 2)
 
@@ -202,23 +197,24 @@ class GameScreen(Screen):
         cls.timer.on_done = cls.setup_bot
 
     @classmethod
-    def play_next_turn_sounds(cls):
+    def start_timer(cls):
         cls.timer.start(config.TIMER)
-        SoundManager.play(
-            config.DICE_SOUND_PATH,
-            volume=GameManager.options.volume,
-        )
+        GameManager.sound_manager.play(config.DICE_SOUND.key)
 
     @classmethod
     def setup_bot(cls):
+        cls.bot = True
+        if cls.backgammon.is_turn_done():
+            cls.ai_moves = []
+            return
+        
         def save_ai_moves(scored_moves: ScoredMoves):
             cls.ai_moves = scored_moves.moves
             print(cls.ai_moves)
-
-        cls.bot = True
+            
         cls.bot_current_time = time.time()
         BackgammonAI.get_best_move(game=cls.backgammon, callback=save_ai_moves)
-    
+
     @classmethod
     def move_bot(
         cls,
@@ -289,34 +285,44 @@ class GameScreen(Screen):
         raise NotImplementedError
 
     @classmethod
-    def highlight_tracks(cls, is_my_turn = True):
+    def highlight_tracks(cls, is_my_turn=True):
         cls.highlighted_indexes = []
 
         if not cls.is_screen_on_top() and not cls.bot and is_my_turn:
             cls.highlighted_indexes = cls.get_highlighted_tracks()
 
         cls.graphics.highlight_tracks(cls.highlighted_indexes)
-        
+
     @classmethod
     def done_turn(cls):
         pass
         raise NotImplementedError
-    
+
     @classmethod
     def undo_move(cls):
         pass
         raise NotImplementedError
-    
+
     @classmethod
-    def render_board(cls, is_online = True, opponent_color: pygame.Color | None = None):
+    def render_board(cls, is_online=True, opponent_color: pygame.Color | None = None):
         player_colors = {
-            Player.player1: ColorConverter.pydantic_to_pygame(GameManager.options.player_colors[Player.player1]),
-            Player.player2: ColorConverter.pydantic_to_pygame(GameManager.options.player_colors[Player.player2]) if opponent_color is None else opponent_color,
+            Player.player1: ColorConverter.pydantic_to_pygame(
+                GameManager.options.player_colors[Player.player1]
+            ),
+            Player.player2: (
+                ColorConverter.pydantic_to_pygame(
+                    GameManager.options.player_colors[Player.player2]
+                )
+                if opponent_color is None
+                else opponent_color
+            ),
         }
         cls.graphics.render_board(
-            game_state=cls.backgammon.state, player_colors=player_colors, is_online=is_online
+            game_state=cls.backgammon.state,
+            player_colors=player_colors,
+            is_online=is_online,
         )
-        
+
     @classmethod
     def update_game_buttons(cls):
         cls.done_button.disabled = (
@@ -325,7 +331,7 @@ class GameScreen(Screen):
         cls.undo_button.disabled = (
             not cls.has_history() or not cls.is_my_turn() or cls.bot
         )
-        
+
     @classmethod
     def has_history(cls):
         pass

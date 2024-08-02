@@ -33,7 +33,7 @@ class StyledBetterButton(BetterButtonElement):
             base_color=config.BUTTON_COLOR,
             hovering_color=config.BUTTON_HOVER_COLOR,
             on_click=on_click,
-            sound=GameManager.get_sound("button"),
+            sound=GameManager.sound_manager.get_sound(config.BUTTON_SOUND.key),
             padding=padding
         )
 
@@ -55,7 +55,7 @@ class StyledButton(ButtonElement):
             on_click=on_click,
             base_color=config.BUTTON_COLOR,
             hovering_color=config.BUTTON_HOVER_COLOR,
-            sound=GameManager.get_sound("button"),
+            sound=GameManager.sound_manager.get_sound(config.BUTTON_SOUND.key),
         )
 
 
@@ -80,7 +80,7 @@ class StyledTextField(TextFieldElement):
             text_align=text_align,
             on_enter=on_enter,
             on_value_changed=on_value_changed,
-            sound=GameManager.get_sound("button"),
+            sound=GameManager.sound_manager.get_sound(config.BUTTON_SOUND.key),
         )
 
 
@@ -123,5 +123,5 @@ class StyledSlider(SliderElement):
             id=id,
             show_value=show_value,
             step=step,
-            sound=GameManager.get_sound("button"),
+            sound=GameManager.sound_manager.get_sound(config.BUTTON_SOUND.key),
         )
