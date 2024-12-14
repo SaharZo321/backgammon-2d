@@ -1,33 +1,44 @@
 import pygame
 import sys
 import config
-from enum import Enum
-from typing import Any
-
-class SettingsKeys(Enum):
-    IP = 0
-    PIECE_COLOR = 1
-    OPPONENT_COLOR = 2
+from models import ColorConverter, Options, Player
+from sound_manager import SoundManager
 
 
 class GameManager:
     clock: pygame.time.Clock
     screen: pygame.Surface
-    _settings: dict[SettingsKeys]
+    options = Options(
+        ip="",
+        player_colors={
+            Player.player1: ColorConverter.pygame_to_pydantic(
+                pygame.Color(100, 100, 100)
+            ),
+            Player.player2: ColorConverter.pygame_to_pydantic(
+                pygame.Color(150, 100, 100)
+            ),
+        },
+    )
 
+    sound_manager: SoundManager
+    
     @classmethod
     def start(cls):
-        cls._settings = {
-            SettingsKeys.IP: "",
-            SettingsKeys.OPPONENT_COLOR: pygame.Color(150, 100, 100),
-            SettingsKeys.PIECE_COLOR: pygame.Color(100, 100, 100),
-        }
         pygame.init()
         pygame.font.init()
+        pygame.mixer.init()
         pygame.display.set_caption("Backgammon")
         cls.clock = pygame.time.Clock()
         cls.screen = pygame.display.set_mode(config.RESOLUTION)
-        pygame.display.set_icon(config.ICON)
+        pygame.display.set_icon(config.GAME_ICON)
+        cls.sound_manager = SoundManager(
+            sounds={
+                **config.BUTTON_SOUND.dump(),
+                **config.DICE_SOUND.dump(),
+                **config.TIMER_SOUND.dump(),
+                **config.PIECE_SOUND.dump(),
+            }
+        )
 
     @staticmethod
     def quit():
@@ -35,14 +46,5 @@ class GameManager:
         sys.exit()
 
     @classmethod
-    def set_setting(cls, key: SettingsKeys, value: Any):
-        cls._settings[key] = value
-        
-    @classmethod
-    def get_setting(cls, key: SettingsKeys) -> Any:
-        return cls._settings[key]
-    
-    @classmethod
     def is_window_focused(cls):
         return pygame.key.get_focused()
-    
