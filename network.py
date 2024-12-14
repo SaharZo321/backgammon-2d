@@ -63,7 +63,7 @@ class BGServer:
         print(f"Closing connection to {address}")
         writer.close()
         await writer.wait_closed()
-    
+
     async def handle_client(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ):
@@ -74,7 +74,7 @@ class BGServer:
             print(f"{address} joined to an active game")
             await self.close_connection(writer=writer, address=address)
             return
-        
+
         self._game_started_event.set()
         self.connected = True
 
@@ -96,7 +96,7 @@ class BGServer:
                     self.done_turn()
                 elif request == ServerFlags.leave:
                     print(f"Player2 ({address}) left the game.")
-                    
+
                     self.connected = False
                     self.online_backgammon.is_player2_connected = False
                     break
@@ -119,9 +119,9 @@ class BGServer:
                 self.connected = False
                 print(f"Connection to {address} cancelled")
                 break
-        
+
         await self.close_connection(writer=writer, address=address)
-    
+
     async def send_data(self, writer: asyncio.StreamWriter, data):
         writer.write(pickle.dumps(data))
         await writer.drain()
@@ -130,7 +130,7 @@ class BGServer:
         if self.server_thread is not None:
             print("Server already running.")
             return
-        
+
         if self._stop_event.is_set():
             self._stop_event = asyncio.Event()
             print("Starting again.")
@@ -164,6 +164,7 @@ class BGServer:
     def stop_server(self):
         print("Server shutting down")
         self._stop_event.set()
+
         async def close_server():
             if self.server:
                 self.server.close()
@@ -179,6 +180,9 @@ class BGServer:
     @property
     def game_started(self) -> bool:
         return self._game_started_event.is_set()
+
+    def set_local_color(self, local_color: Color) -> None:
+        self.online_backgammon.local_color = local_color
 
     def move_piece(self, move: Move) -> OnlineGameState:
         backgammon = self._get_game()
@@ -221,9 +225,7 @@ class NetworkClient:
         self._timed_out_event = asyncio.Event()
         self._started_event = asyncio.Event()
         self._stop_event = asyncio.Event()
-        self.request_queue: Queue[tuple[Any, Callable[[Any], None]]] = (
-            Queue()
-        )
+        self.request_queue: Queue[tuple[Any, Callable[[Any], None]]] = Queue()
         self.time_on_receive = 0
         self.client_thread = None
 
@@ -247,10 +249,10 @@ class NetworkClient:
 
         while not self._stop_event.is_set():
             try:
-                data, on_recieve = self.request_queue.get(timeout=1)
+                data, on_receive = self.request_queue.get(timeout=1)
                 await self.handle_send_data(data=data, writer=writer)
                 self.request_queue.task_done()
-                await self.handle_recieved_data(on_recieve=on_recieve, reader=reader)
+                await self.handle_received_data(on_receive=on_receive, reader=reader)
             except EmptyQueueError:
                 print("Empty queue...")
                 continue
@@ -262,11 +264,10 @@ class NetworkClient:
     async def handle_send_data(self, data, writer: asyncio.StreamWriter):
         writer.write(pickle.dumps(data))
         await writer.drain()
-        print(f"Data sent: {data}")
-        
+        # print(f"Data sent: {data}")
 
-    async def handle_recieved_data(
-        self, on_recieve: Callable[[Any], None], reader: asyncio.StreamReader
+    async def handle_received_data(
+        self, on_receive: Callable[[Any], None], reader: asyncio.StreamReader
     ):
         try:
             raw_data = await asyncio.wait_for(
@@ -276,9 +277,9 @@ class NetworkClient:
                 self.disconnect(threaded=True)
                 print("Received no data, closing client")
                 return
-            print("Data recieved.")
+            # print("Data received.")
             data = pickle.loads(raw_data)
-            on_recieve(data)
+            on_receive(data)
             self.time_on_receive = time.time()
         except TimeoutError:
             self.disconnect(threaded=True)
@@ -286,12 +287,12 @@ class NetworkClient:
         except Exception as ex:
             self.disconnect(threaded=True)
             print(f"Un handled exception: {ex}")
-            
-    def send(self, data, on_recieve: Callable[[Any], None] = lambda x: None):
+
+    def send(self, data, on_receive: Callable[[Any], None] = lambda x: None):
         if not self._started_event.is_set() or self._stop_event.is_set():
             print("Not connected, cannot send")
             return
-        request = (data, on_recieve)
+        request = (data, on_receive)
         self.request_queue.put(request)
 
     def connect(self):
@@ -301,19 +302,19 @@ class NetworkClient:
         self.request_queue = Queue()
         self._started_event = asyncio.Event()
         self._stop_event = asyncio.Event()
-        
+
         @run_threaded(daemon=True)
         def connect_threaded():
             asyncio.run(self.handle_connection())
             print("Client disconnected")
-        
+
         self.client_thread = connect_threaded()
 
     def disconnect(self, data=None, threaded=False):
         if not self.client_thread:
             print("Cannot disconnect. Client not connected")
             return
-        
+
         if data is not None:
             self.send(data=data)
             self.request_queue.join()
@@ -332,5 +333,5 @@ class NetworkClient:
         return self._started_event.is_set()
 
     @property
-    def time_from_last_recieve(self):
+    def time_from_last_receive(self):
         return time.time() - self.time_on_receive

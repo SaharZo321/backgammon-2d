@@ -6,7 +6,7 @@ from models import GameState, MoveType, OnlineGameState, ScoredMoves
 from models import Player
 import copy
 from models import Move
-from typing import Callable, Self
+from typing import Callable
 
 type Dice = tuple[int, int]
 
@@ -14,15 +14,15 @@ type Dice = tuple[int, int]
 class Backgammon:
     _history: list[GameState]
 
-    def deepcopy(self):
-        bg = Backgammon(state_list=[state.model_copy() for state in self._history])
-        return bg
-
     def __init__(self, state_list: list[GameState] | None = None) -> None:
         if state_list is None:
             self.new_game()
         else:
             self._history = state_list
+    
+    def deepcopy(self):
+        bg = Backgammon(state_list=[state.model_copy() for state in self._history])
+        return bg
 
     def new_game(self, winner: Player | None = None):
         dice = self.roll_dice()
@@ -319,15 +319,20 @@ class Backgammon:
             current_score[winner] += 2
         return current_score
 
+    
+    def enumerate_board(self):
+        piece_type = self.get_piece_type(self.current_turn)
+        for position, placement in enumerate(self.board):
+            if placement * piece_type > 0:
+                yield position
+    
     def get_movable_pieces(self) -> list[int]:
         if self.bar[self.current_turn] > 0:
             return []
         placements: list[int] = []
-        piece_type = self.get_piece_type(self.current_turn)
-        for position, placement in enumerate(self.board):
+        for position in self.enumerate_board():
             if (
-                placement * piece_type > 0
-                and len(self.get_possible_tracks(position)) > 0
+                len(self.get_possible_tracks(position)) > 0
             ):
                 placements.append(position)
         return placements
@@ -408,8 +413,8 @@ class OnlineBackgammon:
         new_board = [0] * len(board)
 
         for index, track in enumerate(board):
-            oposite_index = len(board) - index - 1
-            new_board[oposite_index] = track * -1
+            opposite_index = len(board) - index - 1
+            new_board[opposite_index] = track * -1
 
         bar = self.game.bar
         new_bar = {
@@ -451,7 +456,7 @@ class OnlineBackgammon:
     def get_online_game_state(self, state: GameState | None = None) -> OnlineGameState:
         if state is None:
             state = self.game.state
-
+        
         return state.to_online_game_state(
             online_color=self.online_color,
             local_color=self.local_color,

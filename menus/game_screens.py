@@ -125,7 +125,6 @@ class BotGame(GameScreen):
     @classmethod
     def on_random_click(cls):
         cls.last_clicked_index = -1
-        print(cls.is_my_turn())
 
     @classmethod
     def has_history(cls):
@@ -311,7 +310,7 @@ class LocalClientGame(GameScreen):
                 cls.move_bot(on_move=cls.on_bot_move)
 
             cls.save_state(state=cls.server.local_get_game_state())
-
+            
             cls.render_board(
                 is_online=True,
                 opponent_color=ColorConverter.pydantic_to_pygame(
@@ -379,6 +378,8 @@ class LocalClientGame(GameScreen):
             cls.play_piece_sound()
         
         cls.online_state = state
+        cls.server.set_local_color(GameManager.options.player_colors[Player.player1])
+
         cls.backgammon = Backgammon([state])
 
     @classmethod
@@ -579,7 +580,7 @@ class OnlineClientGame(GameScreen):
     
     @classmethod
     def on_bot_move(cls, move: Move):
-        cls.network_client.send(data=move, on_recieve=cls.save_state)
+        cls.network_client.send(data=move, on_receive=cls.save_state)
     
     @classmethod
     def on_random_click(cls):
@@ -592,7 +593,7 @@ class OnlineClientGame(GameScreen):
             start=cls.last_clicked_index,
             end=clicked_index,
         )
-        cls.network_client.send(data=move, on_recieve=cls.save_state)
+        cls.network_client.send(data=move, on_receive=cls.save_state)
         cls.last_clicked_index = -1
 
     @classmethod
@@ -602,13 +603,13 @@ class OnlineClientGame(GameScreen):
             start=cls.backgammon.get_start_position(),
             end=clicked_index,
         )
-        cls.network_client.send(data=move, on_recieve=cls.save_state)
+        cls.network_client.send(data=move, on_receive=cls.save_state)
         cls.last_clicked_index = -1
 
     @classmethod
     def on_bear_off(cls):
         move = Move(move_type=MoveType.bear_off, start=cls.last_clicked_index, end=24)
-        cls.network_client.send(data=move, on_recieve=cls.save_state)
+        cls.network_client.send(data=move, on_receive=cls.save_state)
         cls.last_clicked_index = -1
 
     @classmethod
@@ -623,11 +624,11 @@ class OnlineClientGame(GameScreen):
 
     @classmethod
     def done_turn(cls):
-        cls.network_client.send(data=ServerFlags.done, on_recieve=cls.save_state)
+        cls.network_client.send(data=ServerFlags.done, on_receive=cls.save_state)
 
     @classmethod
     def undo_move(cls):
-        cls.network_client.send(data=ServerFlags.undo, on_recieve=cls.save_state)
+        cls.network_client.send(data=ServerFlags.undo, on_receive=cls.save_state)
 
     @classmethod
     def is_screen_on_top(cls):
@@ -637,7 +638,7 @@ class OnlineClientGame(GameScreen):
 
     @classmethod
     def is_reconnecting(cls):
-        return cls.network_client.time_from_last_recieve > cls.timeout / 2
+        return cls.network_client.time_from_last_receive > cls.timeout / 2
 
     @classmethod
     def save_state(cls, state: OnlineGameState):
@@ -663,7 +664,7 @@ class OnlineClientGame(GameScreen):
     def send_color(cls):
         cls.network_client.send(
             data=GameManager.options.player_colors[Player.player1],
-            on_recieve=cls.save_state,
+            on_receive=cls.save_state,
         )
 
     @classmethod
