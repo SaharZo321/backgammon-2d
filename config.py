@@ -1,21 +1,46 @@
+import math
+from typing import Literal
 import pygame
 from asset import asset
 import os
+
+from models import GameSound
 
 DEFAULT_PLAYER1_COLOR = pygame.Color(100, 100, 100)
 DEFAULT_PLAYER2_COLOR = pygame.Color(150, 100, 100)
 NETWORK_BUFFER = 2048 * 2
 GAME_PORT = 6324
 RESOLUTION: tuple[int, int] = (1280, 720)
+SCREEN = pygame.Rect(0, 0, 1280, 720)
 FRAMERATE: int = 60
 BUTTON_COLOR = pygame.Color(200, 0, 0)
 BUTTON_HOVER_COLOR = pygame.Color(250, 250, 250)
 BACKGROUND = pygame.transform.scale(
-    pygame.image.load(asset(os.path.join("assets", "background.jpg"))), (1280, 720)
+    pygame.image.load(asset(os.path.join("assets", "images", "background.jpg"))),
+    (1280, 720),
 )
 OPTIONS_ICON = pygame.transform.scale(
-    pygame.image.load(asset(os.path.join("assets", "settings.png"))), (60, 60)
+    pygame.image.load(asset(os.path.join("assets", "images", "settings.png"))), (60, 60)
 )
-ICON = pygame.transform.scale(
-    pygame.image.load(asset(os.path.join("assets", "backgammon.png"))), (60, 60)
+GAME_ICON = pygame.transform.scale(
+    pygame.image.load(asset(os.path.join("assets", "images", "backgammon.png"))),
+    (60, 60),
 )
+VOLUME_ICON = pygame.transform.scale(
+    pygame.image.load(asset(os.path.join("assets", "images", "volume.png"))), (60, 60)
+)
+MUTE_ICON = pygame.transform.scale(
+    pygame.image.load(asset(os.path.join("assets", "images", "mute.png"))), (60, 60)
+)
+
+type x = dict[Literal["button"], str]
+
+BUTTON_SOUND = GameSound(key="button", path=asset(os.path.join("assets", "sounds", "button.wav")))
+DICE_SOUND = GameSound(key="dice", path=asset(os.path.join("assets", "sounds", "dice.wav")))
+PIECE_SOUND = GameSound(key="piece", path=asset(os.path.join("assets", "sounds", "piece.mp3")))
+TIMER_SOUND = GameSound(key="timer", path=asset(os.path.join("assets", "sounds", "timer.wav")))
+
+TIMER = 20
+
+def get_font(size: int, bold=False, italic=False) -> pygame.font.Font:
+    return pygame.font.SysFont("Cooper Black", size, bold, italic)

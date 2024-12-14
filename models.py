@@ -1,8 +1,8 @@
-from enum import Enum
-from typing import Self
-from pydantic import BaseModel
-
+from enum import StrEnum, auto
+from typing import Literal
+from pydantic import BaseModel, Field
 from pydantic_extra_types.color import Color as PydanticColor
+import pygame
 
 
 class Address(BaseModel):
@@ -10,12 +10,12 @@ class Address(BaseModel):
     port: int
 
 
-class Player(Enum):
-    player1 = 1
-    player2 = -1
+class Player(StrEnum):
+    player1 = auto()
+    player2 = auto()
 
     @classmethod
-    def other(cls, player: Self) -> Self:
+    def other(cls, player: type["Player"]):
         return cls.player2 if player == cls.player1 else cls.player1
 
 
@@ -27,28 +27,38 @@ class GameState(BaseModel):
     dice: tuple[int, int]
     moves_left: list[int]
     score: dict[Player, int]
-    history: list[Self]
 
-    def to_online(
-        self, online_color: PydanticColor, local_color: PydanticColor
+    def to_online_game_state(
+        self,
+        online_color: PydanticColor,
+        local_color: PydanticColor,
+        history_length: int,
     ):
-        attributes = self.model_dump()
-        attributes["online_color"] = online_color
-        attributes["local_color"] = local_color
+        dump = self.model_dump()
 
-        return OnlineGameState(**attributes)
+        return OnlineGameState(
+            **dump,
+            online_color=online_color,
+            local_color=local_color,
+            history_length=history_length,
+        )
+
+    def is_board_equal(self, state: type["GameState"]):
+        return all(
+            [track == state.board[index] for index, track in enumerate(self.board)]
+        )
 
 
 class OnlineGameState(GameState):
+    history_length: int
     online_color: PydanticColor
     local_color: PydanticColor
-    history: list[GameState]
-    
 
-class MoveType(Enum):
-    leave_bar = 1
-    normal_move = 2
-    bear_off = 3
+
+class MoveType(StrEnum):
+    leave_bar = auto()
+    normal_move = auto()
+    bear_off = auto()
 
 
 class Move(BaseModel):
@@ -60,3 +70,53 @@ class Move(BaseModel):
 class ScoredMoves(BaseModel):
     moves: list[Move]
     score: int
+
+
+class ServerFlags(StrEnum):
+    leave = auto()
+    get_current_state = auto()
+    done = auto()
+    undo = auto()
+
+
+class Position(BaseModel):
+    anchor: Literal[
+        "topleft",
+        "bottomleft",
+        "topright",
+        "bottomright",
+        "midtop",
+        "midleft",
+        "midbottom",
+        "midright",
+        "center",
+    ] = Field(default="center")
+    coords: tuple[int, int] = Field(default=(0, 0))
+
+    def dump(self):
+        return {self.anchor: self.coords}
+
+
+class Options(BaseModel):
+    ip: str
+    player_colors: dict[Player, PydanticColor]
+
+
+class ColorConverter:
+    @staticmethod
+    def pydantic_to_pygame(pydantic_color: PydanticColor) -> pygame.Color:
+        rgb = pydantic_color.as_rgb_tuple()
+        return pygame.Color(*rgb)
+
+    @staticmethod
+    def pygame_to_pydantic(pygame_color: pygame.Color) -> PydanticColor:
+        rgb = pygame_color.r, pygame_color.g, pygame_color.b
+        return PydanticColor(value=rgb)
+
+class GameSound(BaseModel):
+    path: str
+    key: str
+    
+    def dump(self):
+        return {self.key: self.path}
+    
