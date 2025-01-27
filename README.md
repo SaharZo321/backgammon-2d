@@ -43,7 +43,6 @@ Download the precompiled executable file from the [Releases](https://github.com/
 
 ## Technologies Used
 
-- **Python**: Programming language
 - **Pygame**: Game development library
 - **Asyncio**: For managing asynchronous tasks (server implementation)
 
